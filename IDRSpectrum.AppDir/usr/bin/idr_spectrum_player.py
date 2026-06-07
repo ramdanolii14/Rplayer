@@ -5,6 +5,7 @@ gi.require_version("Gst", "1.0")
 
 from gi.repository import Gtk, Gdk, Gst, GLib, Gio
 import os, sys, math, json, random
+from pathlib import Path
 
 Gst.init(None)
 
@@ -17,6 +18,53 @@ IDR_MAX         = 18_999.0
 HISTORY_LEN     = 120        # titik di grafik kurs
 
 AUDIO_EXTS = {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".opus", ".aac", ".wma"}
+
+# ── Persistent Config ─────────────────────────────────────────────────────────
+CONFIG_DIR  = Path.home() / ".config" / "idr-spectrum"
+CONFIG_FILE = CONFIG_DIR / "config.json"
+
+DEFAULT_CONFIG = {
+    "is_dark":       True,
+    "spec_color":    "Hijau",
+    "chart_color":   "Biru",
+    "spec_visible":  True,
+    "shuffle":       False,
+    "repeat_mode":   "none",
+    "volume":        1.0,
+    "library":       [],
+    "current_idx":   -1,
+}
+
+def load_config() -> dict:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            # merge dengan default agar key baru selalu ada
+            cfg = dict(DEFAULT_CONFIG)
+            cfg.update(data)
+            return cfg
+        except Exception:
+            pass
+    return dict(DEFAULT_CONFIG)
+
+def save_config(cfg: dict):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[Config] Gagal menyimpan: {e}")
+
+# ── Default Music SVG Icon ────────────────────────────────────────────────────
+DEFAULT_MUSIC_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">
+  <rect width="56" height="56" rx="10" fill="#1a1c20"/>
+  <circle cx="28" cy="28" r="20" fill="#212429"/>
+  <circle cx="28" cy="28" r="12" fill="#141618"/>
+  <circle cx="28" cy="28" r="4" fill="#2a4fa8"/>
+  <path d="M22 20 L22 36 L38 28 Z" fill="#7aacff" opacity="0.7"/>
+</svg>"""
 
 # ── Spectrum Color Presets ────────────────────────────────────────────────────
 SPECTRUM_COLORS = {
@@ -481,6 +529,94 @@ class MusicLibrary:
             return os.path.basename(self.tracks[idx])
         return ""
 
+    def get_cover_bytes(self, idx: int) -> bytes | None:
+        """Coba ekstrak cover art dari metadata file audio."""
+        if not (0 <= idx < len(self.tracks)):
+            return None
+        path = self.tracks[idx]
+        ext  = os.path.splitext(path)[1].lower()
+        try:
+            if ext in (".mp3",):
+                from gi.repository import GLib as _GL
+                import struct
+                with open(path, "rb") as f:
+                    header = f.read(10)
+                if header[:3] != b"ID3":
+                    return None
+                size = (header[6] & 0x7f) << 21 | (header[7] & 0x7f) << 14 | \
+                       (header[8] & 0x7f) << 7  | (header[9] & 0x7f)
+                with open(path, "rb") as f:
+                    f.read(10)
+                    tag_data = f.read(size)
+                i = 0
+                while i < len(tag_data) - 10:
+                    fid  = tag_data[i:i+4].decode("latin-1", errors="replace")
+                    fsz  = struct.unpack(">I", tag_data[i+4:i+8])[0]
+                    i   += 10
+                    if fid == "APIC" and fsz > 0:
+                        raw = tag_data[i:i+fsz]
+                        # skip encoding byte, mime, pic type, desc
+                        j = 1
+                        while j < len(raw) and raw[j] != 0: j += 1
+                        j += 1  # skip null
+                        j += 1  # skip picture type
+                        while j < len(raw) and raw[j] != 0: j += 1
+                        j += 1  # skip null after desc
+                        return raw[j:]
+                    i += fsz
+            elif ext in (".flac",):
+                with open(path, "rb") as f:
+                    if f.read(4) != b"fLaC":
+                        return None
+                    while True:
+                        hdr = f.read(4)
+                        if len(hdr) < 4: break
+                        btype = hdr[0] & 0x7f
+                        last  = (hdr[0] & 0x80) != 0
+                        bsize = (hdr[1] << 16) | (hdr[2] << 8) | hdr[3]
+                        data  = f.read(bsize)
+                        if btype == 6:  # PICTURE
+                            import struct as _s
+                            off  = 0
+                            _pt  = _s.unpack_from(">I", data, off)[0]; off += 4
+                            ml   = _s.unpack_from(">I", data, off)[0]; off += 4
+                            off += ml  # skip mime
+                            dl   = _s.unpack_from(">I", data, off)[0]; off += 4
+                            off += dl  # skip desc
+                            off += 16  # width,height,depth,colors
+                            pl   = _s.unpack_from(">I", data, off)[0]; off += 4
+                            return data[off:off+pl]
+                        if last: break
+            elif ext in (".m4a", ".aac"):
+                with open(path, "rb") as f:
+                    raw = f.read(1 << 20)  # baca max 1MB
+                import struct as _s
+                i = 0
+                def find_atom(data, name, start=0):
+                    pos = start
+                    while pos < len(data) - 8:
+                        sz = _s.unpack_from(">I", data, pos)[0]
+                        nm = data[pos+4:pos+8]
+                        if sz < 8: break
+                        if nm == name: return pos, sz
+                        pos += sz
+                    return -1, 0
+                # Cari ilst → covr
+                p, _ = find_atom(raw, b"moov")
+                if p < 0: return None
+                p2, _ = find_atom(raw, b"udta", p+8)
+                p3, _ = find_atom(raw, b"meta", p2+8 if p2 >= 0 else p+8)
+                p4, _ = find_atom(raw, b"ilst", p3+12 if p3 >= 0 else p+8)
+                p5, s5 = find_atom(raw, b"covr", p4+8 if p4 >= 0 else p+8)
+                if p5 >= 0 and s5 > 16:
+                    # data atom inside covr
+                    dp = p5 + 8
+                    dsz = _s.unpack_from(">I", raw, dp)[0]
+                    return raw[dp+16:dp+dsz] if dsz > 16 else None
+        except Exception:
+            pass
+        return None
+
     def __len__(self): return len(self.tracks)
 
 
@@ -575,29 +711,83 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         # Set icon — akan muncul di taskbar / dock
         self.set_icon_name("id.ramdanolii.idrspectrum")
 
-        self.is_dark        = True
-        self.theme          = DARK_THEME
+        # ── Load persistent config ──
+        self._cfg           = load_config()
+        self.is_dark        = self._cfg["is_dark"]
+        self.theme          = DARK_THEME if self.is_dark else LIGHT_THEME
         self.idr_rate       = DEFAULT_RATE
         self.is_playing     = False
         self.duration_ns    = 0
         self.current_file   = None
         self._upd_pos       = False
-        self.spec_visible   = True
-        self.shuffle        = False
-        self.repeat_mode    = "none"
+        self.spec_visible   = self._cfg["spec_visible"]
+        self.shuffle        = self._cfg["shuffle"]
+        self.repeat_mode    = self._cfg["repeat_mode"]
         self.library        = MusicLibrary()
         self.current_idx    = -1
         self._idr_history   = [IDR_MIN] * HISTORY_LEN
-        self._spec_color    = DEFAULT_SPEC_COLOR
-        self._chart_color   = DEFAULT_CHART_COLOR
+        self._spec_color    = self._cfg["spec_color"]
+        self._chart_color   = self._cfg["chart_color"]
 
         self._setup_css()
         self._build_pipeline()
         self._build_ui()
         self.set_default_size(1050, 680)
 
+        # ── Restore library from config ──
+        saved_lib = self._cfg.get("library", [])
+        for path in saved_lib:
+            self.library.add(path)
+        if self.library.tracks:
+            self._refresh_library_ui()
+
+        # Restore volume
+        vol = self._cfg.get("volume", 1.0)
+        self.vol_bar.set_value(vol)
+        self.volume_el.set_property("volume", vol)
+
+        # Restore spectrum visibility
+        self._viz_revealer.set_reveal_child(self.spec_visible)
+        if not self.spec_visible:
+            self.hide_spec_btn.set_label("⊞")
+            self.hide_spec_btn.set_tooltip_text("Tampilkan spektrum")
+            self.hide_spec_btn.add_css_class("active")
+
+        # Restore shuffle/repeat UI state
+        if self.shuffle:
+            self.shuffle_btn.add_css_class("active")
+        modes  = ["none", "all", "one"]
+        labels = {"none": "↺", "all": "↺↺", "one": "①"}
+        self.repeat_btn.set_label(labels[self.repeat_mode])
+        if self.repeat_mode != "none":
+            self.repeat_btn.add_css_class("active")
+
+        # Restore theme button label
+        self.theme_btn.set_label("☀" if self.is_dark else "☾")
+
+        # Auto-save config setiap 30 detik
+        GLib.timeout_add(30_000, self._autosave_config)
+
         GLib.timeout_add(400, self._tick)
         GLib.timeout_add(100, self._spectrum_idr_tick)
+
+    # ── Config Persistence ────────────────────────────────────────────────────
+    def _build_current_config(self) -> dict:
+        return {
+            "is_dark":      self.is_dark,
+            "spec_color":   self._spec_color,
+            "chart_color":  self._chart_color,
+            "spec_visible": self.spec_visible,
+            "shuffle":      self.shuffle,
+            "repeat_mode":  self.repeat_mode,
+            "volume":       self.vol_bar.get_value(),
+            "library":      list(self.library.tracks),
+            "current_idx":  self.current_idx,
+        }
+
+    def _autosave_config(self):
+        save_config(self._build_current_config())
+        return True  # terus berulang
 
     # ── CSS ───────────────────────────────────────────────────────────────────
     def _build_css(self):
@@ -798,6 +988,31 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             background-color: {t['entry_bg']};
             color: {t['text_primary']};
         }}
+        .lib-add-btn {{
+            background-color: {t['entry_bg']};
+            border: 1px solid {t['entry_border']};
+            border-radius: 8px;
+            padding: 7px 10px;
+            color: {t['text_primary']};
+            font-size: 12px;
+        }}
+        .lib-add-btn:hover {{
+            background-color: {t['list_item_hover']};
+            border-color: {t['tab_active_bd']};
+            color: {t['tab_active_fg']};
+        }}
+        .lib-clear-btn {{
+            background: none;
+            border: none;
+            color: {t['text_muted']};
+            font-size: 10px;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }}
+        .lib-clear-btn:hover {{
+            color: #e05555;
+            background-color: rgba(224,85,85,0.08);
+        }}
         dialog {{
             background-color: {t['window_bg']};
             color: {t['text_primary']};
@@ -824,6 +1039,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         self.chart.queue_draw()
         self.viz.theme = self.theme
         self.viz.queue_draw()
+        self._album_art.queue_draw()
 
     # ── GStreamer Pipeline ────────────────────────────────────────────────────
     def _build_pipeline(self):
@@ -1080,7 +1296,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         lbl.set_hexpand(True)
         lbl.set_halign(Gtk.Align.START)
 
-        self.lib_count_lbl = Gtk.Label(label="0")
+        self.lib_count_lbl = Gtk.Label(label="0 lagu")
         self.lib_count_lbl.add_css_class("dim")
 
         hdr.append(lbl)
@@ -1090,24 +1306,53 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         panel.append(sep)
 
-        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        add_file_btn = Gtk.Button(label="+ File")
-        add_file_btn.add_css_class("ctrl-btn")
+        # ── Action buttons — rework: dua baris, lebih visual ──
+        # Baris atas: tambah file + tambah folder (full-width look)
+        add_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+
+        add_file_btn = Gtk.Button()
+        add_file_btn.add_css_class("lib-add-btn")
+        af_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        af_icon  = Gtk.Label(label="🎵")
+        af_label = Gtk.Label(label="Tambah File Musik")
+        af_label.set_halign(Gtk.Align.START)
+        af_label.set_hexpand(True)
+        af_inner.append(af_icon)
+        af_inner.append(af_label)
+        add_file_btn.set_child(af_inner)
+        add_file_btn.set_tooltip_text("Tambah satu atau beberapa file audio")
         add_file_btn.connect("clicked", self._lib_add_file)
 
-        add_folder_btn = Gtk.Button(label="+ Folder")
-        add_folder_btn.add_css_class("ctrl-btn")
+        add_folder_btn = Gtk.Button()
+        add_folder_btn.add_css_class("lib-add-btn")
+        fo_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        fo_icon  = Gtk.Label(label="📂")
+        fo_label = Gtk.Label(label="Tambah Folder")
+        fo_label.set_halign(Gtk.Align.START)
+        fo_label.set_hexpand(True)
+        fo_inner.append(fo_icon)
+        fo_inner.append(fo_label)
+        add_folder_btn.set_child(fo_inner)
+        add_folder_btn.set_tooltip_text("Scan seluruh folder secara rekursif")
         add_folder_btn.connect("clicked", self._lib_add_folder)
 
-        clear_btn = Gtk.Button(label="✕")
-        clear_btn.add_css_class("ctrl-btn")
-        clear_btn.set_tooltip_text("Hapus semua")
-        clear_btn.connect("clicked", self._lib_clear)
+        add_box.append(add_file_btn)
+        add_box.append(add_folder_btn)
 
-        btn_row.append(add_file_btn)
-        btn_row.append(add_folder_btn)
-        btn_row.append(clear_btn)
-        panel.append(btn_row)
+        # Baris bawah: clear semua (kecil, di kanan)
+        clear_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        clear_row.set_halign(Gtk.Align.END)
+        clear_btn = Gtk.Button(label="✕  Hapus Semua")
+        clear_btn.add_css_class("lib-clear-btn")
+        clear_btn.set_tooltip_text("Hapus semua lagu dari library")
+        clear_btn.connect("clicked", self._lib_clear)
+        clear_row.append(clear_btn)
+
+        panel.append(add_box)
+        panel.append(clear_row)
+
+        sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        panel.append(sep2)
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
@@ -1251,6 +1496,13 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
 
         ctrl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 
+        # ── Album Art / Music Icon ──
+        self._album_art = Gtk.DrawingArea()
+        self._album_art.set_size_request(44, 44)
+        self._album_art.set_draw_func(self._draw_album_art)
+        self._album_art_pixbuf = None  # None = pakai default SVG
+        ctrl.append(self._album_art)
+
         open_btn = Gtk.Button(label="☰")
         open_btn.add_css_class("ctrl-btn")
         open_btn.set_tooltip_text("Buka file musik")
@@ -1307,6 +1559,89 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         bar.append(ctrl)
         return bar
 
+    def _draw_album_art(self, _w, cr, width, height):
+        """Gambar album art atau default music icon."""
+        import math as _m
+        r = min(width, height) / 2
+        cx, cy = width / 2, height / 2
+
+        if self._album_art_pixbuf is not None:
+            # Album art dari metadata — crop lingkaran
+            from gi.repository import GdkPixbuf
+            pb = self._album_art_pixbuf
+            scale = min(width / pb.get_width(), height / pb.get_height())
+            sw = pb.get_width() * scale
+            sh = pb.get_height() * scale
+            ox = (width - sw) / 2
+            oy = (height - sh) / 2
+            cr.save()
+            cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
+            cr.clip()
+            cr.scale(scale, scale)
+            from gi.repository import Gdk
+            Gdk.cairo_set_source_pixbuf(cr, pb, ox / scale, oy / scale)
+            cr.paint()
+            cr.restore()
+            # Ring
+            cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
+            cr.set_source_rgba(1, 1, 1, 0.15)
+            cr.set_line_width(1.5)
+            cr.stroke()
+        else:
+            # Default music icon — vinyl disc style
+            t = self.theme
+            # Outer disc
+            cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
+            cr.set_source_rgb(0.10, 0.11, 0.13)
+            cr.fill()
+            # Grooves
+            for ri in [r * 0.85, r * 0.70, r * 0.55]:
+                cr.arc(cx, cy, ri, 0, 2 * _m.pi)
+                cr.set_source_rgba(1, 1, 1, 0.04)
+                cr.set_line_width(1)
+                cr.stroke()
+            # Center label
+            cr.arc(cx, cy, r * 0.38, 0, 2 * _m.pi)
+            if self.is_dark:
+                cr.set_source_rgb(0.11, 0.18, 0.38)
+            else:
+                cr.set_source_rgb(0.18, 0.31, 0.72)
+            cr.fill()
+            # Center dot
+            cr.arc(cx, cy, r * 0.10, 0, 2 * _m.pi)
+            cr.set_source_rgb(0.06, 0.06, 0.07)
+            cr.fill()
+            # Music note
+            cr.set_source_rgba(0.48, 0.67, 1.0, 0.85)
+            cr.set_font_size(r * 0.40)
+            cr.select_font_face("sans-serif", 0, 0)
+            ext = cr.text_extents("♫")
+            cr.move_to(cx - ext.width / 2 - ext.x_bearing,
+                       cy - ext.height / 2 - ext.y_bearing)
+            cr.show_text("♫")
+            # Border ring
+            cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
+            cr.set_source_rgba(1, 1, 1, 0.08)
+            cr.set_line_width(1.5)
+            cr.stroke()
+
+    def _update_album_art(self, idx: int):
+        """Load album art untuk track idx, update DrawingArea."""
+        from gi.repository import GdkPixbuf, GLib as _GL
+        self._album_art_pixbuf = None
+        raw = self.library.get_cover_bytes(idx)
+        if raw:
+            try:
+                loader = GdkPixbuf.PixbufLoader()
+                loader.write(raw)
+                loader.close()
+                pb = loader.get_pixbuf()
+                if pb:
+                    self._album_art_pixbuf = pb
+            except Exception:
+                pass
+        self._album_art.queue_draw()
+
     # ── Library Actions ───────────────────────────────────────────────────────
     def _lib_add_file(self, _btn):
         dialog = Gtk.FileChooserDialog(
@@ -1332,6 +1667,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             for f in files:
                 self.library.add(f.get_path())
             self._refresh_library_ui()
+            save_config(self._build_current_config())
         dialog.destroy()
 
     def _lib_add_folder(self, _btn):
@@ -1350,12 +1686,14 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             folder = dialog.get_file().get_path()
             self.library.add_folder(folder)
             self._refresh_library_ui()
+            save_config(self._build_current_config())
         dialog.destroy()
 
     def _lib_clear(self, _btn):
         self.library.clear()
         self.current_idx = -1
         self._refresh_library_ui()
+        save_config(self._build_current_config())
 
     def _refresh_library_ui(self):
         child = self.lib_list.get_first_child()
@@ -1368,7 +1706,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             row = self._make_lib_row(i, path)
             self.lib_list.append(row)
 
-        self.lib_count_lbl.set_text(str(len(self.library)))
+        self.lib_count_lbl.set_text(f"{len(self.library)} lagu")
 
     def _make_lib_row(self, idx: int, path: str):
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -1409,6 +1747,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         elif idx < self.current_idx:
             self.current_idx -= 1
         self._refresh_library_ui()
+        save_config(self._build_current_config())
 
     # ── Playback ──────────────────────────────────────────────────────────────
     def _play_index(self, idx: int):
@@ -1419,6 +1758,8 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         self._load(path)
         self._do_play()
         self._refresh_library_ui()
+        self._update_album_art(idx)
+        save_config(self._build_current_config())
 
     def _prev_track(self, _btn=None):
         n = len(self.library)
@@ -1441,6 +1782,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             self.shuffle_btn.add_css_class("active")
         else:
             self.shuffle_btn.remove_css_class("active")
+        save_config(self._build_current_config())
 
     def _toggle_repeat(self, _btn):
         modes  = ["none", "all", "one"]
@@ -1451,6 +1793,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             self.repeat_btn.add_css_class("active")
         else:
             self.repeat_btn.remove_css_class("active")
+        save_config(self._build_current_config())
 
     def _toggle_spectrum(self, _btn):
         self.spec_visible = not self.spec_visible
@@ -1463,6 +1806,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             self.hide_spec_btn.set_label("⊞")
             self.hide_spec_btn.set_tooltip_text("Tampilkan spektrum")
             self.hide_spec_btn.add_css_class("active")
+        save_config(self._build_current_config())
 
     def _toggle_theme(self, _btn):
         self.is_dark = not self.is_dark
@@ -1470,6 +1814,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         self.theme_btn.set_label("☀" if self.is_dark else "☾")
         self.theme_btn.set_tooltip_text("Ganti ke Light" if self.is_dark else "Ganti ke Dark")
         self._reload_css()
+        save_config(self._build_current_config())
 
     def _open_settings(self, _btn):
         dlg = SettingsDialog(
@@ -1485,11 +1830,13 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         self._spec_color = name
         self.viz.color_preset = name
         self.viz.queue_draw()
+        save_config(self._build_current_config())
 
     def _on_chart_color_changed(self, name: str):
         self._chart_color = name
         self.chart.color_preset = name
         self.chart.queue_draw()
+        save_config(self._build_current_config())
 
     def _load(self, path: str):
         self.current_file = path
@@ -1548,6 +1895,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             idx = self.library.tracks.index(path)
             self._refresh_library_ui()
             self._play_index(idx)
+            save_config(self._build_current_config())
         dialog.destroy()
 
     def _on_seek(self, _scale, _scroll_type, value):
