@@ -1,7 +1,7 @@
 # IDR Spectrum Player
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="IDR Spectrum Player Screenshot" width="800"/>
+  <img src="assets/Rplayer.png" alt="IDR Spectrum Player Screenshot" width="800"/>
 </p>
 
 <p align="center">
