@@ -474,16 +474,15 @@ class SpectrumVisualizer(Gtk.DrawingArea):
         n = len(mags)
         if n == 0: return
         step = width / n
-        mid  = height / 2
 
-        cr.move_to(0, mid)
+        # Hanya gambar bagian atas (bukan mirror)
+        cr.move_to(0, height)
         for i, db in enumerate(mags):
             v = self._norm(db)
-            cr.line_to(i * step, mid - v * mid * 0.88)
-        for i in range(n - 1, -1, -1):
-            v = self._norm(mags[i])
-            cr.line_to(i * step, mid + v * mid * 0.88)
+            cr.line_to(i * step, height - v * height * 0.90)
+        cr.line_to((n - 1) * step, height)
         cr.close_path()
+
         preset = SPECTRUM_COLORS[self.color_preset]
         cr.set_source_rgba(*preset["wave_f"])
         cr.fill_preserve()
@@ -492,9 +491,9 @@ class SpectrumVisualizer(Gtk.DrawingArea):
         cr.stroke()
 
         wfr, wfg, wfb, _ = preset["wave_f"]
-        cr.set_source_rgba(wfr, wfg, wfb, 0.15)
+        cr.set_source_rgba(wfr, wfg, wfb, 0.12)
         cr.set_line_width(1)
-        cr.move_to(0, mid); cr.line_to(width, mid); cr.stroke()
+        cr.move_to(0, height); cr.line_to(width, height); cr.stroke()
 
 
 # ── Library Store ──────────────────────────────────────────────────────────────
@@ -703,6 +702,178 @@ class SettingsDialog(Gtk.Dialog):
         self._on_chart_color(name)
 
 
+# ── About Dialog ───────────────────────────────────────────────────────────────
+class AboutDialog(Gtk.Dialog):
+    """Dialog informasi aplikasi dengan logo, maintainer, version, dan sha256."""
+    def __init__(self, parent):
+        super().__init__(title="Tentang IDR Spectrum Player", transient_for=parent, modal=True)
+        self.set_default_size(440, -1)
+
+        close_btn = Gtk.Button(label="Tutup")
+        close_btn.connect("clicked", lambda _: self.destroy())
+        self.add_action_widget(close_btn, Gtk.ResponseType.CLOSE)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        box.set_margin_top(22); box.set_margin_bottom(20)
+        box.set_margin_start(28); box.set_margin_end(28)
+
+        # ── Logo ──
+        try:
+            from gi.repository import GdkPixbuf
+            svg_candidates = [
+                Path(__file__).parent / "id.ramdanolii.idrspectrum.svg",
+                Path(__file__).parent / "IDRSpectrum.AppDir" / "id.ramdanolii.idrspectrum.svg",
+            ]
+            logo = None
+            for svg_path in svg_candidates:
+                if svg_path.exists():
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_size(str(svg_path), 80, 80)
+                    logo = Gtk.Image.new_from_pixbuf(pb)
+                    break
+            if logo is None:
+                logo = Gtk.Image.new_from_icon_name("id.ramdanolii.idrspectrum")
+                logo.set_pixel_size(80)
+        except Exception:
+            logo = Gtk.Label(label="♫")
+        logo.set_halign(Gtk.Align.CENTER)
+        box.append(logo)
+
+        # ── Nama Aplikasi ──
+        app_name = Gtk.Label(label="IDR Spectrum Player")
+        app_name.set_halign(Gtk.Align.CENTER)
+        app_name.add_css_class("section-title")
+        app_name.add_css_class("mono")
+        box.append(app_name)
+
+        desc = Gtk.Label(label="Pemutar Musik Native Linux dengan Visualisasi Kurs Rupiah")
+        desc.set_halign(Gtk.Align.CENTER)
+        desc.add_css_class("dim")
+        desc.set_wrap(True)
+        box.append(desc)
+
+        box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+
+        # ── Info Grid ──
+        grid = Gtk.Grid()
+        grid.set_row_spacing(10)
+        grid.set_column_spacing(16)
+
+        def key_lbl(text):
+            l = Gtk.Label(label=text)
+            l.add_css_class("dim")
+            l.set_halign(Gtk.Align.END)
+            return l
+
+        def val_lbl(text):
+            l = Gtk.Label(label=text)
+            l.set_halign(Gtk.Align.START)
+            l.set_selectable(True)
+            return l
+
+        def link_btn(uri, label):
+            b = Gtk.LinkButton.new_with_label(uri, label)
+            b.set_halign(Gtk.Align.START)
+            return b
+
+        grid.attach(key_lbl("Maintainer"), 0, 0, 1, 1)
+        grid.attach(val_lbl("ramdanolii14"),            1, 0, 1, 1)
+
+        grid.attach(key_lbl("Email"),      0, 1, 1, 1)
+        grid.attach(link_btn("mailto:ramdanolii1410@gmail.com", "ramdanolii1410@gmail.com"), 1, 1, 1, 1)
+
+        grid.attach(key_lbl("Repositori"), 0, 2, 1, 1)
+        grid.attach(link_btn("https://github.com/ramdanolii14/Rplayer",
+                              "github.com/ramdanolii14/Rplayer"),           1, 2, 1, 1)
+
+        grid.attach(key_lbl("Lisensi"),    0, 3, 1, 1)
+        grid.attach(link_btn("https://github.com/ramdanolii14/Rplayer/blob/main/LICENSE",
+                              "GNU GPL v3"),                                 1, 3, 1, 1)
+
+        grid.attach(key_lbl("Versi"),      0, 4, 1, 1)
+        self._ver_lbl = val_lbl("Memuat...")
+        grid.attach(self._ver_lbl, 1, 4, 1, 1)
+
+        grid.attach(key_lbl("SHA256"),     0, 5, 1, 1)
+        self._sha_lbl = val_lbl("Menghitung...")
+        self._sha_lbl.set_ellipsize(3)
+        self._sha_lbl.set_max_width_chars(38)
+        grid.attach(self._sha_lbl, 1, 5, 1, 1)
+
+        box.append(grid)
+        box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+
+        # ── Kontributor ──
+        contrib_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        contrib_title = Gtk.Label(label="INGIN BERKONTRIBUSI?")
+        contrib_title.add_css_class("section-title")
+        contrib_title.add_css_class("mono")
+        contrib_title.set_halign(Gtk.Align.CENTER)
+        contrib_box.append(contrib_title)
+
+        contrib_links = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        contrib_links.set_halign(Gtk.Align.CENTER)
+        contrib_links.append(link_btn(
+            "https://github.com/ramdanolii14/Rplayer/issues",
+            "🐛  Laporkan Bug"
+        ))
+        contrib_links.append(link_btn(
+            "https://github.com/ramdanolii14/Rplayer/pulls",
+            "🔧  Pull Request"
+        ))
+        contrib_links.append(link_btn(
+            "https://github.com/ramdanolii14/Rplayer/fork",
+            "🍴  Fork Repo"
+        ))
+        contrib_box.append(contrib_links)
+        box.append(contrib_box)
+
+        self.get_content_area().append(box)
+
+        # Load versi & SHA256 di background thread
+        GLib.timeout_add(80, self._start_load)
+
+    def _start_load(self):
+        import threading
+        threading.Thread(target=self._load_info, daemon=True).start()
+        return False
+
+    def _load_info(self):
+        import hashlib, urllib.request, json as _json
+
+        # SHA256 dari script yang sedang berjalan
+        try:
+            script = Path(sys.argv[0]).resolve()
+            h = hashlib.sha256()
+            with open(script, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    h.update(chunk)
+            sha = h.hexdigest()
+        except Exception:
+            sha = "tidak dapat dihitung"
+
+        # Versi dari GitHub (commit SHA terbaru di main)
+        try:
+            req = urllib.request.Request(
+                "https://api.github.com/repos/ramdanolii14/Rplayer/commits/main",
+                headers={"Accept": "application/vnd.github.v3+json",
+                         "User-Agent": "IDRSpectrum/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=6) as r:
+                d = _json.loads(r.read())
+            short_sha = d["sha"][:7]
+            msg       = d["commit"]["message"].split("\n")[0][:50]
+            ver_text  = f"{short_sha}  —  {msg}"
+        except Exception:
+            ver_text = "offline (tidak dapat terhubung ke GitHub)"
+
+        GLib.idle_add(self._apply_info, ver_text, sha)
+
+    def _apply_info(self, ver, sha):
+        self._ver_lbl.set_text(ver)
+        self._sha_lbl.set_text(sha)
+        return False
+
+
 # ── Main Window ────────────────────────────────────────────────────────────────
 class IDRSpectrumWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -765,11 +936,99 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         # Restore theme button label
         self.theme_btn.set_label("☀" if self.is_dark else "☾")
 
+        # ── Restore warna spektrum & grafik dari config ──
+        self.viz.color_preset = self._spec_color
+        self.chart.color_preset = self._chart_color
+
         # Auto-save config setiap 30 detik
         GLib.timeout_add(30_000, self._autosave_config)
 
         GLib.timeout_add(400, self._tick)
         GLib.timeout_add(100, self._spectrum_idr_tick)
+
+        # ── Keyboard shortcuts (window-level CAPTURE agar tidak dibajak button) ──
+        key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        key_ctrl.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_ctrl)
+
+    # ── Keyboard Shortcuts ────────────────────────────────────────────────────
+    def _on_key_pressed(self, _ctrl, keyval, _keycode, state):
+        """Handle global keyboard shortcuts. Dipanggil SEBELUM widget manapun."""
+        ctrl  = bool(state & Gdk.ModifierType.CONTROL_MASK)
+        shift = bool(state & Gdk.ModifierType.SHIFT_MASK)
+        # Abaikan modifier lain selain Ctrl dan Shift
+        only_ctrl  = ctrl and not shift
+        no_mod     = not ctrl and not shift
+
+
+        # ── Play / Pause ── Space
+        if keyval == Gdk.KEY_space and no_mod:
+            if self.current_file:
+                self._play_pause(None)
+            return True
+
+        # ── Navigasi track ──
+        if keyval == Gdk.KEY_Right and only_ctrl:
+            self._next_track(None)
+            return True
+        if keyval == Gdk.KEY_Left and only_ctrl:
+            self._prev_track(None)
+            return True
+
+        # ── Seek ± 5 detik ── ← → tanpa modifier
+        if keyval == Gdk.KEY_Right and no_mod:
+            self._seek_relative(+5)
+            return True
+        if keyval == Gdk.KEY_Left and no_mod:
+            self._seek_relative(-5)
+            return True
+
+        # ── Volume ── Ctrl+↑ / Ctrl+↓
+        if keyval == Gdk.KEY_Up and only_ctrl:
+            v = min(1.0, self.vol_bar.get_value() + 0.1)
+            self.vol_bar.set_value(v)
+            return True
+        if keyval == Gdk.KEY_Down and only_ctrl:
+            v = max(0.0, self.vol_bar.get_value() - 0.1)
+            self.vol_bar.set_value(v)
+            return True
+
+        # ── Shuffle ── S
+        if keyval in (Gdk.KEY_s, Gdk.KEY_S) and no_mod:
+            self._toggle_shuffle(None)
+            return True
+
+        # ── Repeat ── R
+        if keyval in (Gdk.KEY_r, Gdk.KEY_R) and no_mod:
+            self._toggle_repeat(None)
+            return True
+
+        # ── Toggle spektrum ── H (Hide)
+        if keyval in (Gdk.KEY_h, Gdk.KEY_H) and no_mod:
+            self._toggle_spectrum(None)
+            return True
+
+        # ── Buka file ── Ctrl+O
+        if keyval in (Gdk.KEY_o, Gdk.KEY_O) and only_ctrl:
+            self._open_file(None)
+            return True
+
+        return False
+
+    def _seek_relative(self, seconds: float):
+        """Seek maju/mundur sejumlah detik dari posisi saat ini."""
+        if self.duration_ns <= 0:
+            return
+        ok, pos = self.pipeline.query_position(Gst.Format.TIME)
+        if not ok:
+            return
+        new_pos = max(0, min(self.duration_ns, pos + int(seconds * Gst.SECOND)))
+        self.pipeline.seek_simple(
+            Gst.Format.TIME,
+            Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT,
+            new_pos,
+        )
 
     # ── Config Persistence ────────────────────────────────────────────────────
     def _build_current_config(self) -> dict:
@@ -1020,6 +1279,61 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         dialog .card {{
             background-color: {t['card_bg']};
         }}
+        menubutton button {{
+            background: none;
+            border: 1px solid {t['ctrl_border']};
+            color: {t['ctrl_fg']};
+            border-radius: 8px;
+            min-width: 30px;
+            min-height: 28px;
+            padding: 0 6px;
+            font-size: 15px;
+            box-shadow: none;
+            outline: none;
+        }}
+        menubutton button:hover {{
+            background-color: {t['entry_bg']};
+            color: {t['text_primary']};
+            border-color: {t['entry_border']};
+            box-shadow: none;
+        }}
+        menubutton button:active,
+        menubutton button:checked {{
+            background-color: {t['entry_bg']};
+            color: {t['text_primary']};
+            border-color: {t['entry_border']};
+            box-shadow: none;
+        }}
+        menubutton button:focus {{
+            box-shadow: none;
+            outline: none;
+        }}
+        popover contents {{
+            background-color: {t['card_bg']};
+            border: 1px solid {t['card_border']};
+            border-radius: 10px;
+            padding: 2px;
+        }}
+        popover arrow {{
+            background-color: {t['card_bg']};
+        }}
+        popover button.flat {{
+            background: none;
+            border: none;
+            border-radius: 6px;
+            color: {t['text_primary']};
+            padding: 8px 14px;
+            font-size: 12px;
+            min-width: 180px;
+        }}
+        popover button.flat:hover {{
+            background-color: {t['list_item_hover']};
+            color: {t['text_primary']};
+        }}
+        popover button.flat:active {{
+            background-color: {t['tab_active_bg']};
+            color: {t['tab_active_fg']};
+        }}
         """
 
     def _setup_css(self):
@@ -1187,7 +1501,8 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         return True
 
     def _spectrum_idr_tick(self):
-        if not self.is_playing:
+        # Hanya drift saat tidak ada file yang di-load (bukan saat pause)
+        if not self.is_playing and self.current_file is None:
             drift = random.gauss(0, 8)
             self.idr_rate = max(IDR_MIN, min(IDR_MAX, self.idr_rate + drift))
             self.chart.push(self.idr_rate)
@@ -1262,16 +1577,49 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         title_box.set_hexpand(True)
         title_box.set_halign(Gtk.Align.START)
 
-        # Settings button (⚙)
-        settings_btn = Gtk.Button(label="⚙")
+        # Settings MenuButton dengan dropdown
+        settings_btn = Gtk.MenuButton()
+        settings_btn.set_label("⚙")
         settings_btn.add_css_class("icon-btn")
-        settings_btn.set_tooltip_text("Pengaturan warna")
-        settings_btn.connect("clicked", self._open_settings)
+        settings_btn.set_tooltip_text("Menu pengaturan")
+        settings_btn.set_focusable(False)
+        settings_btn.set_focus_on_click(False)
+
+        popover = Gtk.Popover()
+        popover.set_has_arrow(False)
+        pop_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        pop_box.set_margin_top(6); pop_box.set_margin_bottom(6)
+        pop_box.set_margin_start(4); pop_box.set_margin_end(4)
+
+        def _on_settings_item(_b):
+            popover.popdown()
+            self._open_settings(None)
+
+        def _on_about_item(_b):
+            popover.popdown()
+            self._open_about(None)
+
+        settings_item = Gtk.Button(label="⚙   Pengaturan Warna")
+        settings_item.add_css_class("flat")
+        settings_item.set_halign(Gtk.Align.FILL)
+        settings_item.connect("clicked", _on_settings_item)
+
+        about_item = Gtk.Button(label="ℹ   Tentang Aplikasi")
+        about_item.add_css_class("flat")
+        about_item.set_halign(Gtk.Align.FILL)
+        about_item.connect("clicked", _on_about_item)
+
+        pop_box.append(settings_item)
+        pop_box.append(about_item)
+        popover.set_child(pop_box)
+        settings_btn.set_popover(popover)
 
         # Theme toggle
         self.theme_btn = Gtk.Button(label="☀")
         self.theme_btn.add_css_class("icon-btn")
-        self.theme_btn.set_tooltip_text("Ganti tema")
+        self.theme_btn.set_tooltip_text("Ganti tema terang/gelap")
+        self.theme_btn.set_focusable(False)
+        self.theme_btn.set_focus_on_click(False)
         self.theme_btn.connect("clicked", self._toggle_theme)
 
         bar.append(title_box)
@@ -1312,6 +1660,8 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
 
         add_file_btn = Gtk.Button()
         add_file_btn.add_css_class("lib-add-btn")
+        add_file_btn.set_focusable(False)
+        add_file_btn.set_focus_on_click(False)
         af_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         af_icon  = Gtk.Label(label="🎵")
         af_label = Gtk.Label(label="Tambah File Musik")
@@ -1325,6 +1675,8 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
 
         add_folder_btn = Gtk.Button()
         add_folder_btn.add_css_class("lib-add-btn")
+        add_folder_btn.set_focusable(False)
+        add_folder_btn.set_focus_on_click(False)
         fo_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         fo_icon  = Gtk.Label(label="📂")
         fo_label = Gtk.Label(label="Tambah Folder")
@@ -1344,6 +1696,8 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         clear_row.set_halign(Gtk.Align.END)
         clear_btn = Gtk.Button(label="✕  Hapus Semua")
         clear_btn.add_css_class("lib-clear-btn")
+        clear_btn.set_focusable(False)
+        clear_btn.set_focus_on_click(False)
         clear_btn.set_tooltip_text("Hapus semua lagu dari library")
         clear_btn.connect("clicked", self._lib_clear)
         clear_row.append(clear_btn)
@@ -1462,6 +1816,8 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         for mode in ("BASS", "MID", "FULL", "WAVE", "MAKS"):
             b = Gtk.Button(label=mode)
             b.add_css_class("tab-pill")
+            b.set_focusable(False)
+            b.set_focus_on_click(False)
             if mode == "FULL":
                 b.add_css_class("active")
             b.connect("clicked", self._switch_view, mode)
@@ -1471,7 +1827,9 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         # Toggle spektrum — ICON saja, bukan teks panjang
         self.hide_spec_btn = Gtk.Button(label="⊟")
         self.hide_spec_btn.add_css_class("icon-btn")
-        self.hide_spec_btn.set_tooltip_text("Sembunyikan spektrum")
+        self.hide_spec_btn.set_tooltip_text("Tampilkan/Sembunyikan spektrum  [H]")
+        self.hide_spec_btn.set_focusable(False)
+        self.hide_spec_btn.set_focus_on_click(False)
         self.hide_spec_btn.connect("clicked", self._toggle_spectrum)
 
         hdr.append(spec_lbl)
@@ -1503,38 +1861,50 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         self._album_art_pixbuf = None  # None = pakai default SVG
         ctrl.append(self._album_art)
 
-        open_btn = Gtk.Button(label="☰")
+        def _nb(btn):
+            # Non-focusable button — klik tidak steal keyboard focus.
+            btn.set_focusable(False)
+            btn.set_focus_on_click(False)
+            return btn
+
+        open_btn = _nb(Gtk.Button(label="☰"))
         open_btn.add_css_class("ctrl-btn")
-        open_btn.set_tooltip_text("Buka file musik")
+        open_btn.set_tooltip_text("Buka file musik  [Ctrl+O]")
         open_btn.connect("clicked", self._open_file)
 
-        self.prev_btn = Gtk.Button(label="⏮")
+        self.prev_btn = _nb(Gtk.Button(label="⏮"))
         self.prev_btn.add_css_class("ctrl-btn")
+        self.prev_btn.set_tooltip_text("Lagu sebelumnya  [Ctrl+←]")
         self.prev_btn.connect("clicked", self._prev_track)
 
-        self.play_btn = Gtk.Button(label="▶")
+        self.play_btn = _nb(Gtk.Button(label="▶"))
         self.play_btn.add_css_class("play-btn")
         self.play_btn.set_sensitive(False)
+        self.play_btn.set_tooltip_text("Play / Pause  [Space]")
         self.play_btn.connect("clicked", self._play_pause)
 
-        self.next_btn = Gtk.Button(label="⏭")
+        self.next_btn = _nb(Gtk.Button(label="⏭"))
         self.next_btn.add_css_class("ctrl-btn")
+        self.next_btn.set_tooltip_text("Lagu berikutnya  [Ctrl+→]")
         self.next_btn.connect("clicked", self._next_track)
 
-        self.shuffle_btn = Gtk.Button(label="⇄")
+        self.shuffle_btn = _nb(Gtk.Button(label="⇄"))
         self.shuffle_btn.add_css_class("ctrl-btn")
-        self.shuffle_btn.set_tooltip_text("Shuffle")
+        self.shuffle_btn.set_tooltip_text("Shuffle  [S]")
         self.shuffle_btn.connect("clicked", self._toggle_shuffle)
 
-        self.repeat_btn = Gtk.Button(label="↺")
+        self.repeat_btn = _nb(Gtk.Button(label="↺"))
         self.repeat_btn.add_css_class("ctrl-btn")
-        self.repeat_btn.set_tooltip_text("Repeat")
+        self.repeat_btn.set_tooltip_text("Repeat  [R]")
         self.repeat_btn.connect("clicked", self._toggle_repeat)
 
         self.seek_bar = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
         self.seek_bar.set_range(0, 100)
         self.seek_bar.set_draw_value(False)
         self.seek_bar.set_hexpand(True)
+        self.seek_bar.set_focusable(False)
+        self.seek_bar.set_focus_on_click(False)
+        self.seek_bar.set_tooltip_text("Posisi lagu  [← / → untuk ±5 detik]")
         self.seek_bar.connect("change-value", self._on_seek)
 
         self.time_lbl = Gtk.Label(label="0:00 / 0:00")
@@ -1549,6 +1919,9 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         self.vol_bar.set_value(1.0)
         self.vol_bar.set_draw_value(False)
         self.vol_bar.set_size_request(70, -1)
+        self.vol_bar.set_focusable(False)
+        self.vol_bar.set_focus_on_click(False)
+        self.vol_bar.set_tooltip_text("Volume  [Ctrl+↑ / Ctrl+↓]")
         self.vol_bar.connect("value-changed", self._on_vol)
 
         for w in (open_btn, self.prev_btn, self.play_btn, self.next_btn,
@@ -1566,7 +1939,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         cx, cy = width / 2, height / 2
 
         if self._album_art_pixbuf is not None:
-            # Album art dari metadata — crop lingkaran
+            # Album art dari metadata — tampilkan sebagai kotak (bukan lingkaran)
             from gi.repository import GdkPixbuf
             pb = self._album_art_pixbuf
             scale = min(width / pb.get_width(), height / pb.get_height())
@@ -1575,17 +1948,29 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             ox = (width - sw) / 2
             oy = (height - sh) / 2
             cr.save()
-            cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
+            # Clip kotak dengan sudut sedikit rounded
+            radius = 4.0
+            cr.new_sub_path()
+            cr.arc(radius, radius, radius, _m.pi, 3 * _m.pi / 2)
+            cr.arc(width - radius, radius, radius, 3 * _m.pi / 2, 0)
+            cr.arc(width - radius, height - radius, radius, 0, _m.pi / 2)
+            cr.arc(radius, height - radius, radius, _m.pi / 2, _m.pi)
+            cr.close_path()
             cr.clip()
             cr.scale(scale, scale)
             from gi.repository import Gdk
             Gdk.cairo_set_source_pixbuf(cr, pb, ox / scale, oy / scale)
             cr.paint()
             cr.restore()
-            # Ring
-            cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
-            cr.set_source_rgba(1, 1, 1, 0.15)
-            cr.set_line_width(1.5)
+            # Border tipis kotak
+            cr.set_source_rgba(1, 1, 1, 0.12)
+            cr.set_line_width(1.0)
+            cr.new_sub_path()
+            cr.arc(radius, radius, radius, _m.pi, 3 * _m.pi / 2)
+            cr.arc(width - radius, radius, radius, 3 * _m.pi / 2, 0)
+            cr.arc(width - radius, height - radius, radius, 0, _m.pi / 2)
+            cr.arc(radius, height - radius, radius, _m.pi / 2, _m.pi)
+            cr.close_path()
             cr.stroke()
         else:
             # Default music icon — vinyl disc style
@@ -1725,6 +2110,8 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
 
         del_btn = Gtk.Button(label="✕")
         del_btn.add_css_class("ctrl-btn")
+        del_btn.set_focusable(False)
+        del_btn.set_focus_on_click(False)
         del_btn.connect("clicked", self._lib_remove, idx)
 
         row.append(num)
@@ -1824,6 +2211,10 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             self._on_spec_color_changed,
             self._on_chart_color_changed,
         )
+        dlg.present()
+
+    def _open_about(self, _btn):
+        dlg = AboutDialog(self)
         dlg.present()
 
     def _on_spec_color_changed(self, name: str):

@@ -82,7 +82,7 @@ fi
 # .desktop file — Categories wajib ada AudioVideo agar tidak error
 cat > "$APPDIR/usr/share/applications/id.ramdanolii.idrspectrum.desktop" << 'DESK'
 [Desktop Entry]
-Version=1.0
+Version=1.1
 Type=Application
 Name=IDR Spectrum Player
 GenericName=Music Player
@@ -139,9 +139,9 @@ cat > "$APPDIR/usr/share/metainfo/id.ramdanolii.idrspectrum.appdata.xml" << 'APP
     <mediatype>audio/aac</mediatype>
   </provides>
   <releases>
-    <release version="1.0.0" date="2026-06-07">
+    <release version="1.1.0" date="2026-06-07">
       <description>
-        <p>Rilis perdana IDR Spectrum Player.</p>
+        <p>Rilis IDR Spectrum Player.</p>
       </description>
     </release>
   </releases>
@@ -172,6 +172,6 @@ echo -e "  chmod +x $OUTPUT"
 echo -e "  ./$OUTPUT"
 echo ""
 echo -e "${DIM}Cara publish ke GitHub:${NC}"
-echo -e "  gh release create v1.0.0 $OUTPUT \\"
-echo -e "    --title 'IDR Spectrum Player v1.0.0' \\"
+echo -e "  gh release create v1.1.0 $OUTPUT \\"
+echo -e "    --title 'IDR Spectrum Player v1.1.0' \\"
 echo -e "    --notes 'Music player dengan visualizer spektrum dan grafik kurs IDR'"
