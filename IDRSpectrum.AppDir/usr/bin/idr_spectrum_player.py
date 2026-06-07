@@ -793,11 +793,6 @@ class AboutDialog(Gtk.Dialog):
         self._ver_lbl = val_lbl("Memuat...")
         grid.attach(self._ver_lbl, 1, 4, 1, 1)
 
-        grid.attach(key_lbl("SHA256"),     0, 5, 1, 1)
-        self._sha_lbl = val_lbl("Menghitung...")
-        self._sha_lbl.set_ellipsize(3)
-        self._sha_lbl.set_max_width_chars(38)
-        grid.attach(self._sha_lbl, 1, 5, 1, 1)
 
         box.append(grid)
         box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
@@ -838,18 +833,7 @@ class AboutDialog(Gtk.Dialog):
         return False
 
     def _load_info(self):
-        import hashlib, urllib.request, json as _json
-
-        # SHA256 dari script yang sedang berjalan
-        try:
-            script = Path(sys.argv[0]).resolve()
-            h = hashlib.sha256()
-            with open(script, "rb") as f:
-                for chunk in iter(lambda: f.read(65536), b""):
-                    h.update(chunk)
-            sha = h.hexdigest()
-        except Exception:
-            sha = "tidak dapat dihitung"
+        import urllib.request, json as _json
 
         # Versi dari GitHub (commit SHA terbaru di main)
         try:
@@ -866,11 +850,10 @@ class AboutDialog(Gtk.Dialog):
         except Exception:
             ver_text = "offline (tidak dapat terhubung ke GitHub)"
 
-        GLib.idle_add(self._apply_info, ver_text, sha)
+        GLib.idle_add(self._apply_info, ver_text)
 
-    def _apply_info(self, ver, sha):
+    def _apply_info(self, ver):
         self._ver_lbl.set_text(ver)
-        self._sha_lbl.set_text(sha)
         return False
 
 
