@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=IDR Spectrum Player
+GenericName=Music Player
+Comment=Music player dengan grafik kurs IDR realtime
+Exec=python3 /opt/idr-spectrum/idr_spectrum_player.py %F
+Icon=id.ramdanolii.idrspectrum
+Terminal=false
+Categories=Audio;Music;Player;
+MimeType=audio/mpeg;audio/ogg;audio/flac;audio/wav;audio/x-m4a;audio/opus;audio/aac;audio/x-ms-wma;
+Keywords=music;player;spectrum;idr;rupiah;audio;
+StartupNotify=true
+StartupWMClass=idr_spectrum_player

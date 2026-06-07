@@ -62,8 +62,28 @@ else
     echo -e "${GREEN}✔${NC} Semua dependensi sudah terpasang."
 fi
 
-# ── Run ───────────────────────────────────────────────────────────────────────
+# ── Install icon dan .desktop (opsional, untuk taskbar icon) ──────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ICON_SVG="$SCRIPT_DIR/id.ramdanolii.idrspectrum.svg"
+DESKTOP_FILE="$SCRIPT_DIR/id.ramdanolii.idrspectrum.desktop"
+
+if [ -f "$ICON_SVG" ]; then
+    mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps"
+    cp "$ICON_SVG" "$HOME/.local/share/icons/hicolor/scalable/apps/"
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+    echo -e "${GREEN}✔${NC} Icon terpasang."
+fi
+
+if [ -f "$DESKTOP_FILE" ]; then
+    # Update Exec path sesuai lokasi script saat ini
+    mkdir -p "$HOME/.local/share/applications"
+    sed "s|/opt/idr-spectrum/idr_spectrum_player.py|$SCRIPT_DIR/idr_spectrum_player.py|g" \
+        "$DESKTOP_FILE" > "$HOME/.local/share/applications/id.ramdanolii.idrspectrum.desktop"
+    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+    echo -e "${GREEN}✔${NC} .desktop terpasang (app muncul di launcher & taskbar dengan icon)."
+fi
+
+# ── Run ───────────────────────────────────────────────────────────────────────
 PLAYER="$SCRIPT_DIR/idr_spectrum_player.py"
 
 if [ ! -f "$PLAYER" ]; then
