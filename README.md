@@ -330,10 +330,10 @@ Proyek ini dilisensikan di bawah [GNU General Public License v3.0](LICENSE).
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ramdanolii14/Rplayer&type=Date)](https://star-history.com/#ramdanolii14/Rplayer&Date)
+[![Star History Chart](https://api.star-history.com/chart?repos=ramdanolii14/Rplayer&type=date&logscale&legend=top-left)](https://www.star-history.com/?repos=ramdanolii14%2FRplayer&type=date&logscale=&legend=top-left)
 
 ---
 
 <p align="center">
-  Dibuat dengan penuh perhatian untuk pengguna Arch Linux di Indonesia.
+  Dibuat untuk pengguna Arch Linux di Indonesia.
 </p>
