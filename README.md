@@ -101,7 +101,7 @@ Proyek ini sepenuhnya ditulis dalam Python dengan antarmuka GTK 4, memanfaatkan 
   <em>Grafik kurs IDR bergaya Google Finance yang bergerak mengikuti audio</em>
 </p>
 
-> Catatan: Letakkan screenshot hasil tangkapan layar di folder `assets/` dan sesuaikan nama file di atas.
+> Catatan: Belum Ada
 
 ---
 
