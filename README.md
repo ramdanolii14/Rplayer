@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/github/v/release/ramdanolii14/Rplayer?style=flat-square&color=green"/>
 </p>
 
-Pemutar musik audio native untuk Arch Linux yang menampilkan visualisasi spektrum frekuensi secara real-time, dilengkapi grafik kurs Rupiah (IDR/USD) bergaya Google Finance yang bergerak mengikuti irama musik. Dibangun di atas GTK 4 dan GStreamer, sepenuhnya native tanpa Electron atau runtime berat.
+Pemutar musik audio native untuk Arch Linux yang menampilkan visualisasi spektrum frekuensi secara real-time, dilengkapi grafik kurs Rupiah (IDR/USD) bergaya Google Finance yang bergerak mengikuti irama musik. Dibangun di atas GTK 4 dan GStreamer, sepenuhnya native tanpa Electron atau runtime berat.(udah 17k lagi jir udah gak 18 wkwkwk).
 
 ---
 
