@@ -47,18 +47,17 @@ if (-not $SkipMSYS2Install) {
     Write-Host "`n[1/4] Skipping MSYS2 install check." -ForegroundColor Gray
 }
 
-# ide jelek tapi yaudah
+# perbaiki sebelum deploy
 # ── 2. Install dependencies via pacman ──────────────────────────────────────
 if (-not $SkipPackages) {
     Write-Host "`n[2/4] Installing dependencies via pacman..." -ForegroundColor Yellow
 
-    # perbaiki sebelum deploy
     $pkgs = "mingw-w64-x86_64-python mingw-w64-x86_64-python-gobject mingw-w64-x86_64-gtk4 mingw-w64-x86_64-gstreamer mingw-w64-x86_64-gst-plugins-base mingw-w64-x86_64-gst-plugins-good mingw-w64-x86_64-gst-plugins-bad mingw-w64-x86_64-gst-plugins-ugly mingw-w64-x86_64-gst-libav mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-mutagen mingw-w64-x86_64-cairo mingw-w64-x86_64-pango mingw-w64-x86_64-librsvg"
     
     $pacmanCmds = @(
         "pacman -Syu --noconfirm",
         "pacman -S --noconfirm --needed $pkgs",
-        "pip install pyinstaller"
+        "/mingw64/bin/python -m pip install pyinstaller --break-system-packages"
     )
 
     foreach ($cmd in $pacmanCmds) {
@@ -73,12 +72,13 @@ if (-not $SkipPackages) {
     Write-Host "`n[2/4] Skipping package install." -ForegroundColor Gray
 }
 
+# ide jelek tapi yaudah
 # ── 3. Run PyInstaller via MSYS2 ────────────────────────────────────────────
 if (-not $SkipBuild) {
     Write-Host "`n[3/4] Building with PyInstaller..." -ForegroundColor Yellow
 
     $scriptPath = $SCRIPT_DIR -replace '\\', '/' -replace '^([A-Za-z]):', '/$1'
-    $buildCmd = "cd `"$scriptPath`"; python -m PyInstaller scripts/idr_spectrum.spec --noconfirm"
+    $buildCmd = "cd `"$scriptPath`"; /mingw64/bin/python -m PyInstaller scripts/idr_spectrum.spec --noconfirm"
 
     & $MSYS2_BASH -l -c $buildCmd
     if ($LASTEXITCODE -ne 0) {
