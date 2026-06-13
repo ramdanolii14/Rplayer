@@ -115,6 +115,7 @@ needed_typelibs = [
     "Gtk-4.0.typelib",
     "Gdk-4.0.typelib",
     "GdkWin32-4.0.typelib",
+    "Gsk-4.0.typelib",
     "Gst-1.0.typelib",
     "GstBase-1.0.typelib",
     "GstPbutils-1.0.typelib",
