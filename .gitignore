@@ -2,3 +2,4 @@
 *.AppImage
 WindowsPort/build/
 WindowsPort/dist/
+WindowsPort/IDRSpectrum-Setup-1.1.0.exe
