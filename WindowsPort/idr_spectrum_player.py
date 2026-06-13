@@ -280,6 +280,8 @@ LIGHT_THEME = {
 # ── IDR Currency Chart (Google-style) ─────────────────────────────────────────
 class IDRChart(Gtk.DrawingArea):
     """Grafik kurs seperti Google Finance — spektrum menggerakkan nilai IDR."""
+    __gtype_name__ = "IDRChart"
+
     def __init__(self, theme):
         super().__init__()
         self.theme        = theme
@@ -365,6 +367,8 @@ class IDRChart(Gtk.DrawingArea):
 
 # ── Spectrum Visualizer ────────────────────────────────────────────────────────
 class SpectrumVisualizer(Gtk.DrawingArea):
+    __gtype_name__ = "SpectrumVisualizer"
+
     def __init__(self, theme):
         super().__init__()
         self.theme        = theme
