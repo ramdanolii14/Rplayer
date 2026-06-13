@@ -52,6 +52,7 @@ hidden_imports = [
     "mutagen.mp4",
     "mutagen.asf",
     "mutagen.id3",
+    "email",
 ]
 
 # ── Binaries: GStreamer plugins ───────────────────────────────────────────────
@@ -67,11 +68,11 @@ needed_plugins = [
     "libgstvolume*",
     "libgstautodetect*",
     "libgstaudiotestsrc*",
-    "libgstspectrum*",     # <-- spectrum analyzer
+    "libgstspectrum*",
     "libgstlevel*",
-    "libgstwasapi*",       # Windows audio output
+    "libgstwasapi*",
     "libgstdirectsound*",
-    "libgstlibav*",        # via gst-libav: mp3, aac, m4a, wma
+    "libgstlibav*",
     "libgstflac*",
     "libgstogg*",
     "libgstvorbis*",
@@ -156,7 +157,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=runtime_hooks,
-    excludes=["tkinter", "unittest", "test", "xmlrpc", "email"],
+    excludes=["tkinter", "unittest", "test", "xmlrpc"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     noarchive=False,
