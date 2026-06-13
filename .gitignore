@@ -1,2 +1,4 @@
 *.log
 *.AppImage
+WindowsPort/build/
+WindowsPort/dist/
