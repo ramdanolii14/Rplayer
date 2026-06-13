@@ -16,6 +16,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# logic
+$env:MSYSTEM = "MINGW64"
+$env:MINGW_PREFIX = "C:/msys64/mingw64"
+
 $MSYS2_ROOT   = "C:\msys64"
 $MSYS2_BASH   = "$MSYS2_ROOT\usr\bin\bash.exe"
 $MINGW_BIN    = "$MSYS2_ROOT\mingw64\bin"
@@ -77,8 +81,8 @@ if (-not $SkipPackages) {
 if (-not $SkipBuild) {
     Write-Host "`n[3/4] Building with PyInstaller..." -ForegroundColor Yellow
 
-    $scriptPath = $SCRIPT_DIR -replace '\\', '/' -replace '^([A-Za-z]):', '/$1'
-    $buildCmd = "cd `"$scriptPath`"; /mingw64/bin/python -m PyInstaller scripts/idr_spectrum.spec --noconfirm"
+    $scriptPath = $SCRIPT_DIR -replace '\\', '/' -replace '^([A-Za-z]):', '/$1' -replace ' ', '\ '
+    $buildCmd = "export MSYSTEM=MINGW64; export MINGW_PREFIX=C:/msys64/mingw64; cd $scriptPath; /mingw64/bin/python -m PyInstaller scripts/idr_spectrum.spec --noconfirm"
 
     & $MSYS2_BASH -l -c $buildCmd
     if ($LASTEXITCODE -ne 0) {
@@ -97,7 +101,6 @@ if (-not $SkipBuild) {
     Write-Host "`n[3/4] Skipping PyInstaller build." -ForegroundColor Gray
 }
 
-# logic
 # ── 4. Build NSIS installer ─────────────────────────────────────────────────
 if (-not $SkipInstaller) {
     Write-Host "`n[4/4] Building NSIS installer..." -ForegroundColor Yellow
