@@ -758,13 +758,13 @@ class WindowUIMixin:
     def _load(self, path: str):
         self.current_file = path
         self.pipeline.set_state(Gst.State.NULL)
-        # GStreamer filesrc di Windows tidak toleran backslash — gunakan URI
-        # Gst.filename_to_uri() menangani path Windows maupun POSIX dengan benar
-        try:
-            uri = Gst.filename_to_uri(path)
-        except Exception:
-            uri = Path(path).as_uri()
-        self.src.set_property("location", uri)
+        # filesrc.location harus berupa path filesystem biasa — BUKAN URI.
+        # Pada Windows, Path.as_posix() menghasilkan forward-slash yang
+        # diterima GStreamer filesrc di MSYS2/MinGW tanpa encoding %20.
+        # Jangan pakai Gst.filename_to_uri() di sini karena itu menghasilkan
+        # URI (file:///) yang tidak diterima oleh property "location" filesrc.
+        location = Path(path).as_posix()
+        self.src.set_property("location", location)
         self.pipeline.set_state(Gst.State.PAUSED)
         self.is_playing = False
         self.play_btn.set_label("▶")
@@ -867,4 +867,3 @@ class WindowUIMixin:
             self.usd_entry.handler_unblock_by_func(self._usd_changed)
         except ValueError:
             pass
-

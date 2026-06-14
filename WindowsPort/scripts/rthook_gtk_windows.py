@@ -41,6 +41,11 @@ os.environ["GI_TYPELIB_PATH"] = (
 # ── GTK icons ─────────────────────────────────────────────────────────────────
 os.environ["GTK_DATA_PREFIX"] = BASE
 
+# ── Force GTK tema ke "Default" agar CSS custom tidak di-override Win32 theme ──
+# Tanpa ini, GTK4 di Windows memakai tema "win32" yang mengabaikan banyak
+# CSS selector kustom, sehingga dark mode terlihat rusak / putih semua.
+os.environ.setdefault("GTK_THEME", "Default")
+
 # ── PATH: tambahkan bin bundle ke depan supaya DLL ditemukan ─────────────────
 bundle_bin = BASE
 existing_path = os.environ.get("PATH", "")

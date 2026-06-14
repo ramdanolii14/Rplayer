@@ -355,21 +355,25 @@ class WindowCore(Gtk.ApplicationWindow):
             font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
             letter-spacing: 0.06em;
         }}
-        scale trough {{
+        scale trough,
+        scale > trough {{
             background-color: {t['scale_trough']};
             min-height: 3px;
             border-radius: 2px;
         }}
-        scale highlight {{
+        scale highlight,
+        scale > trough > highlight {{
             background-color: {t['scale_hl']};
             border-radius: 2px;
         }}
-        scale slider {{
+        scale slider,
+        scale > trough > slider {{
             background-color: {t['scale_slider']};
             border-radius: 50%;
             min-width: 11px;
             min-height: 11px;
             border: none;
+            box-shadow: none;
         }}
         .lib-row {{
             background-color: {t['list_item_bg']};
@@ -450,6 +454,13 @@ class WindowCore(Gtk.ApplicationWindow):
             background-color: {t['window_bg']};
             color: {t['text_primary']};
         }}
+        dialog > .dialog-vbox,
+        dialog .dialog-vbox,
+        dialog contents,
+        dialog > contents {{
+            background-color: {t['window_bg']};
+            color: {t['text_primary']};
+        }}
         dialog .card {{
             background-color: {t['card_bg']};
         }}
@@ -482,13 +493,15 @@ class WindowCore(Gtk.ApplicationWindow):
             box-shadow: none;
             outline: none;
         }}
-        popover contents {{
+        popover contents,
+        popover > contents {{
             background-color: {t['card_bg']};
             border: 1px solid {t['card_border']};
             border-radius: 10px;
             padding: 2px;
         }}
-        popover arrow {{
+        popover arrow,
+        popover > arrow {{
             background-color: {t['card_bg']};
         }}
         popover button.flat {{
