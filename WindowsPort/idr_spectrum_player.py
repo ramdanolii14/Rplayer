@@ -3,7 +3,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gst", "1.0")
 
-from gi.repository import Gtk, Gdk, Gst, GLib, Gio
+from gi.repository import Gtk, Gdk, Gst, GLib, Gio, GdkPixbuf
 import os, sys, math, json, random
 from pathlib import Path
 
@@ -20,7 +20,12 @@ HISTORY_LEN     = 120        # titik di grafik kurs
 AUDIO_EXTS = {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".opus", ".aac", ".wma"}
 
 # ── Persistent Config ─────────────────────────────────────────────────────────
-CONFIG_DIR  = Path.home() / ".config" / "idr-spectrum"
+# Windows: %APPDATA%\idr-spectrum  |  Linux/macOS: ~/.config/idr-spectrum
+if sys.platform == "win32":
+    _cfg_base = Path(os.environ.get("APPDATA", Path.home()))
+else:
+    _cfg_base = Path.home() / ".config"
+CONFIG_DIR  = _cfg_base / "idr-spectrum"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULT_CONFIG = {
@@ -749,7 +754,7 @@ class AboutDialog(Gtk.Dialog):
         app_name.add_css_class("mono")
         box.append(app_name)
 
-        desc = Gtk.Label(label="Pemutar Musik Native Linux dengan Visualisasi Kurs Rupiah")
+        desc = Gtk.Label(label="Pemutar Musik dengan Spektrum Visualizer & Kurs Rupiah")
         desc.set_halign(Gtk.Align.CENTER)
         desc.add_css_class("dim")
         desc.set_wrap(True)
@@ -867,7 +872,27 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         super().__init__(application=app, title="IDR Spectrum Player")
 
         # Set icon — akan muncul di taskbar / dock
-        self.set_icon_name("id.ramdanolii.idrspectrum")
+        # Di Windows tidak ada XDG icon theme; load .ico dari bundle secara eksplisit
+        if sys.platform == "win32":
+            _ico_candidates = [
+                # PyInstaller frozen bundle
+                Path(getattr(sys, "_MEIPASS", "")) / "idr_spectrum.ico",
+                # Development tree
+                Path(__file__).parent / "assets" / "idr_spectrum.ico",
+                Path(__file__).parent.parent / "assets" / "idr_spectrum.ico",
+            ]
+            for _ico in _ico_candidates:
+                if _ico.exists():
+                    try:
+                        self.set_icon_name(None)
+                        _pb = GdkPixbuf.Pixbuf.new_from_file(str(_ico))
+                        _tex = Gdk.Texture.new_for_pixbuf(_pb)
+                        self.set_icon_paintable(_tex)  # GTK4
+                    except Exception:
+                        pass
+                    break
+        else:
+            self.set_icon_name("id.ramdanolii.idrspectrum")
 
         # ── Load persistent config ──
         self._cfg           = load_config()
@@ -1042,7 +1067,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         window {{
             background-color: {t['window_bg']};
             color: {t['text_primary']};
-            font-family: 'IBM Plex Sans', 'Noto Sans', sans-serif;
+            font-family: 'IBM Plex Sans', 'Noto Sans', 'Segoe UI', Arial, sans-serif;
         }}
         .card {{
             background-color: {t['card_bg']};
@@ -1058,7 +1083,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             line-height: 1.2;
         }}
         .mono {{
-            font-family: 'Share Tech Mono', 'Monospace', monospace;
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
         }}
         .dim {{
             font-size: 11px;
@@ -1071,7 +1096,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
             border-radius: 8px;
             padding: 6px 10px;
             min-width: 100px;
-            font-family: 'Share Tech Mono', 'Monospace', monospace;
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
             font-size: 13px;
         }}
         .conv-entry:focus {{
@@ -1165,7 +1190,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         .sarcasm-tag {{
             font-size: 10px;
             color: {t['sarcasm']};
-            font-family: 'Share Tech Mono', 'Monospace', monospace;
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
             letter-spacing: 0.06em;
         }}
         scale trough {{
@@ -1206,7 +1231,7 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
         .lib-num {{
             font-size: 10px;
             color: {t['text_muted']};
-            font-family: 'Share Tech Mono', 'Monospace', monospace;
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
             min-width: 22px;
         }}
         .lib-name {{
@@ -2219,7 +2244,13 @@ class IDRSpectrumWindow(Gtk.ApplicationWindow):
     def _load(self, path: str):
         self.current_file = path
         self.pipeline.set_state(Gst.State.NULL)
-        self.src.set_property("location", path)
+        # GStreamer filesrc di Windows tidak toleran backslash — gunakan URI
+        # Gst.filename_to_uri() menangani path Windows maupun POSIX dengan benar
+        try:
+            uri = Gst.filename_to_uri(path)
+        except Exception:
+            uri = Path(path).as_uri()
+        self.src.set_property("location", uri)
         self.pipeline.set_state(Gst.State.PAUSED)
         self.is_playing = False
         self.play_btn.set_label("▶")
@@ -2329,12 +2360,38 @@ class IDRSpectrumApp(Gtk.Application):
     def __init__(self):
         super().__init__(
             application_id="id.ramdanolii.idrspectrum",
-            flags=Gio.ApplicationFlags.FLAGS_NONE,
+            # HANDLES_OPEN: Gio akan routing argv berisi path file ke do_open()
+            # Ini yang membuat double-click file dari Windows Explorer bisa kerja
+            flags=Gio.ApplicationFlags.HANDLES_OPEN,
         )
+        self._win: IDRSpectrumWindow | None = None
 
     def do_activate(self):
-        win = IDRSpectrumWindow(self)
-        win.present()
+        if self._win is None:
+            self._win = IDRSpectrumWindow(self)
+        self._win.present()
+
+    def do_open(self, files, n_files, hint):
+        """Dipanggil saat app diluncurkan dengan argumen file (file association Windows)."""
+        self.do_activate()  # pastikan window sudah ada
+        win = self._win
+        if win is None:
+            return
+        for gfile in files:
+            path = gfile.get_path()
+            if path and Path(path).suffix.lower() in AUDIO_EXTS:
+                win.library.add(path)
+        win._refresh_library_ui()
+        # Mainkan file pertama dari argumen
+        if files:
+            first_path = files[0].get_path()
+            if first_path:
+                try:
+                    idx = win.library.tracks.index(first_path)
+                    win._play_index(idx)
+                except ValueError:
+                    pass
+        save_config(win._build_current_config())
 
 
 if __name__ == "__main__":
