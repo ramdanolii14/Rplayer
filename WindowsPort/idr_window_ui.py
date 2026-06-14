@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # ============================================================
-#  idr_window_ui.py
-#  Mixin pembangun UI jendela utama: navbar, panel library,
-#  kartu kurs IDR, kartu spektrum, player bar, album art, serta
-#  semua handler interaksi (library, playback navigation,
-#  toggle tema/shuffle/repeat/spektrum, dialog pengaturan).
+#  idr_window_ui.py  —  IDR Spectrum Player  (UI Rewrite v2)
 #
-#  WindowUIMixin TIDAK berdiri sendiri — digabung dengan
-#  idr_window_core.WindowCore di idr_spectrum_player.py untuk
-#  membentuk class IDRSpectrumWindow yang lengkap.
-#
-#  Bagian dari IDR Spectrum Player.
+#  Perubahan dari v1:
+#   • Layout 3-kolom (lib | chart+spectrum | album) untuk
+#     menghindari overlap dan resize yang aneh.
+#   • Custom titlebar lewat Gtk.HeaderBar dengan semua
+#     elemen kontrol di dalam GTK — tidak bergantung pada
+#     dekorasi Windows agar dark mode tidak bocor.
+#   • Semua widget pakai CSS class yang sangat eksplisit;
+#     tidak ada widget yang bergantung pada default GTK theme.
+#   • Spectrum card dan chart card digabung agar height
+#     konsisten dan tidak ada gap kosong.
+#   • Player bar di bawah, full-width, dengan album art
+#     terintegrasi di dalam bar (bukan floating).
 # ============================================================
 
 import gi
@@ -28,311 +31,330 @@ from idr_dialogs import SettingsDialog, AboutDialog
 
 
 class WindowUIMixin:
-    """Mixin berisi pembangunan UI & handler interaksi.
+    """Mixin UI — harus dipakai bersama WindowCore."""
 
-    Mengasumsikan dipakai bersama idr_window_core.WindowCore yang
-    menyediakan atribut seperti self.theme, self.library,
-    self.pipeline, self.idr_rate, dst.
-    """
-
-    # ── UI Build ──────────────────────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════
+    #  ROOT BUILD
+    # ═══════════════════════════════════════════════════════════
     def _build_ui(self):
+        # Pakai custom HeaderBar agar titlebar ikut dark mode
+        self._build_headerbar()
+
+        # Root vertical box
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
-        # ── HEADER / NAVBAR ──
-        navbar = self._build_navbar()
-        root.append(navbar)
+        # Body: 2 kolom (lib | main)
+        body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        body.set_vexpand(True)
 
-        # ── BODY ──
-        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        body.set_margin_top(8); body.set_margin_bottom(12)
-        body.set_margin_start(12); body.set_margin_end(12)
-
-        content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-
-        # LEFT: Library
+        # ── Kolom Kiri: Library ──────────────────────────────────────────────
         lib_panel = self._build_library_panel()
-        lib_panel.set_size_request(240, -1)
-        content.append(lib_panel)
+        lib_panel.set_size_request(260, -1)
+        body.append(lib_panel)
 
-        # RIGHT: Currency + Spectrum (collapsible) + Player (fixed bottom)
-        right_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        right_col.set_hexpand(True)
+        # Divider vertikal
+        vsep = Gtk.Box()
+        vsep.set_size_request(1, -1)
+        vsep.add_css_class("vsep")
+        body.append(vsep)
 
-        # Currency + Chart card
-        currency_card = self._build_currency_card()
-        right_col.append(currency_card)
+        # ── Kolom Kanan: Chart + Spectrum ────────────────────────────────────
+        right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        right.set_hexpand(True)
+        right.set_vexpand(True)
 
-        # Spectrum card (collapsible)
-        self._spec_card = self._build_spectrum_card()
-        right_col.append(self._spec_card)
+        right.append(self._build_currency_panel())
 
-        content.append(right_col)
-        body.append(content)
+        hsep = Gtk.Box()
+        hsep.set_size_request(-1, 1)
+        hsep.add_css_class("hsep")
+        right.append(hsep)
 
-        # Track label + Player bar — ALWAYS at fixed position, tidak ikut spectrum
-        self.track_lbl = Gtk.Label(label="// tidak ada file yang dipilih")
-        self.track_lbl.set_halign(Gtk.Align.CENTER)
-        self.track_lbl.add_css_class("track-label")
-        self.track_lbl.add_css_class("mono")
-        body.append(self.track_lbl)
+        right.append(self._build_spectrum_panel())
 
-        player_bar = self._build_player_bar()
-        body.append(player_bar)
-
+        body.append(right)
         root.append(body)
+
+        # ── Player Bar ───────────────────────────────────────────────────────
+        root.append(self._build_player_bar())
+
         self.set_child(root)
 
-    def _build_navbar(self):
-        """Header bar dengan title, settings, dan theme toggle."""
-        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        bar.set_margin_top(10); bar.set_margin_bottom(8)
-        bar.set_margin_start(14); bar.set_margin_end(14)
+    # ═══════════════════════════════════════════════════════════
+    #  CUSTOM HEADER BAR
+    # ═══════════════════════════════════════════════════════════
+    def _build_headerbar(self):
+        hb = Gtk.HeaderBar()
+        hb.set_show_title_buttons(True)
+        hb.add_css_class("app-header")
 
-        # App icon + title
+        # Title kiri
         title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         icon_lbl = Gtk.Label(label="♫")
-        icon_lbl.add_css_class("mono")
-        # buat icon beranimasi saat playing
+        icon_lbl.add_css_class("header-icon")
         self._navbar_icon = icon_lbl
         title_lbl = Gtk.Label(label="IDR SPECTRUM PLAYER")
-        title_lbl.add_css_class("section-title")
-        title_lbl.add_css_class("mono")
+        title_lbl.add_css_class("header-title")
         title_box.append(icon_lbl)
         title_box.append(title_lbl)
-        title_box.set_hexpand(True)
-        title_box.set_halign(Gtk.Align.START)
+        hb.set_title_widget(title_box)
 
-        # Settings MenuButton dengan dropdown
+        def _nb(btn):
+            btn.set_focusable(False)
+            btn.set_focus_on_click(False)
+            return btn
+
+        # Settings button (buka popover)
         settings_btn = Gtk.MenuButton()
         settings_btn.set_label("⚙")
-        settings_btn.add_css_class("icon-btn")
-        settings_btn.set_tooltip_text("Menu pengaturan")
+        settings_btn.add_css_class("hdr-btn")
+        settings_btn.set_tooltip_text("Pengaturan")
         settings_btn.set_focusable(False)
         settings_btn.set_focus_on_click(False)
 
-        popover = Gtk.Popover()
-        popover.set_has_arrow(False)
+        pop = Gtk.Popover()
+        pop.set_has_arrow(False)
         pop_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         pop_box.set_margin_top(6); pop_box.set_margin_bottom(6)
         pop_box.set_margin_start(4); pop_box.set_margin_end(4)
 
-        def _on_settings_item(_b):
-            popover.popdown()
+        def _settings_click(_b):
+            pop.popdown()
             self._open_settings(None)
 
-        def _on_about_item(_b):
-            popover.popdown()
+        def _about_click(_b):
+            pop.popdown()
             self._open_about(None)
 
-        settings_item = Gtk.Button(label="⚙   Pengaturan Warna")
-        settings_item.add_css_class("flat")
-        settings_item.set_halign(Gtk.Align.FILL)
-        settings_item.connect("clicked", _on_settings_item)
+        for lbl, cb in [("⚙   Pengaturan Warna", _settings_click),
+                         ("ℹ   Tentang Aplikasi",  _about_click)]:
+            btn = Gtk.Button(label=lbl)
+            btn.add_css_class("pop-item")
+            btn.set_halign(Gtk.Align.FILL)
+            btn.connect("clicked", cb)
+            pop_box.append(btn)
 
-        about_item = Gtk.Button(label="ℹ   Tentang Aplikasi")
-        about_item.add_css_class("flat")
-        about_item.set_halign(Gtk.Align.FILL)
-        about_item.connect("clicked", _on_about_item)
-
-        pop_box.append(settings_item)
-        pop_box.append(about_item)
-        popover.set_child(pop_box)
-        settings_btn.set_popover(popover)
+        pop.set_child(pop_box)
+        settings_btn.set_popover(pop)
 
         # Theme toggle
-        self.theme_btn = Gtk.Button(label="☀")
-        self.theme_btn.add_css_class("icon-btn")
-        self.theme_btn.set_tooltip_text("Ganti tema terang/gelap")
-        self.theme_btn.set_focusable(False)
-        self.theme_btn.set_focus_on_click(False)
+        self.theme_btn = _nb(Gtk.Button(label="☀"))
+        self.theme_btn.add_css_class("hdr-btn")
+        self.theme_btn.set_tooltip_text("Ganti tema [Dark/Light]")
         self.theme_btn.connect("clicked", self._toggle_theme)
 
-        bar.append(title_box)
-        bar.append(settings_btn)
-        bar.append(self.theme_btn)
+        hb.pack_end(self.theme_btn)
+        hb.pack_end(settings_btn)
 
-        # Separator bawah navbar
-        wrap = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        wrap.append(bar)
-        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        wrap.append(sep)
-        return wrap
+        self.set_titlebar(hb)
 
+    # ═══════════════════════════════════════════════════════════
+    #  LIBRARY PANEL (kiri)
+    # ═══════════════════════════════════════════════════════════
     def _build_library_panel(self):
-        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        panel.add_css_class("card")
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        panel.add_css_class("lib-panel")
 
-        hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        # ── Header ──────────────────────────────────────────────────────────
+        hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        hdr.add_css_class("lib-header")
+        hdr.set_margin_start(14); hdr.set_margin_end(10)
+        hdr.set_margin_top(10); hdr.set_margin_bottom(10)
+
         lbl = Gtk.Label(label="LIBRARY")
-        lbl.add_css_class("section-title")
-        lbl.add_css_class("mono")
+        lbl.add_css_class("section-cap")
         lbl.set_hexpand(True)
         lbl.set_halign(Gtk.Align.START)
 
         self.lib_count_lbl = Gtk.Label(label="0 lagu")
-        self.lib_count_lbl.add_css_class("dim")
+        self.lib_count_lbl.add_css_class("muted-lbl")
 
         hdr.append(lbl)
         hdr.append(self.lib_count_lbl)
         panel.append(hdr)
 
-        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep = Gtk.Box(); sep.add_css_class("hsep"); sep.set_size_request(-1, 1)
         panel.append(sep)
 
-        # ── Action buttons — rework: dua baris, lebih visual ──
-        # Baris atas: tambah file + tambah folder (full-width look)
-        add_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        # ── Add Buttons ──────────────────────────────────────────────────────
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        btn_box.set_margin_start(10); btn_box.set_margin_end(10)
+        btn_box.set_margin_top(8); btn_box.set_margin_bottom(4)
 
-        add_file_btn = Gtk.Button()
-        add_file_btn.add_css_class("lib-add-btn")
-        add_file_btn.set_focusable(False)
-        add_file_btn.set_focus_on_click(False)
-        af_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        af_icon  = Gtk.Label(label="🎵")
-        af_label = Gtk.Label(label="Tambah File Musik")
-        af_label.set_halign(Gtk.Align.START)
-        af_label.set_hexpand(True)
-        af_inner.append(af_icon)
-        af_inner.append(af_label)
-        add_file_btn.set_child(af_inner)
-        add_file_btn.set_tooltip_text("Tambah satu atau beberapa file audio")
-        add_file_btn.connect("clicked", self._lib_add_file)
+        add_file_btn = self._lib_action_btn("🎵", "Tambah File Musik",
+                                             self._lib_add_file)
+        add_folder_btn = self._lib_action_btn("📂", "Tambah Folder",
+                                               self._lib_add_folder)
+        btn_box.append(add_file_btn)
+        btn_box.append(add_folder_btn)
 
-        add_folder_btn = Gtk.Button()
-        add_folder_btn.add_css_class("lib-add-btn")
-        add_folder_btn.set_focusable(False)
-        add_folder_btn.set_focus_on_click(False)
-        fo_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        fo_icon  = Gtk.Label(label="📂")
-        fo_label = Gtk.Label(label="Tambah Folder")
-        fo_label.set_halign(Gtk.Align.START)
-        fo_label.set_hexpand(True)
-        fo_inner.append(fo_icon)
-        fo_inner.append(fo_label)
-        add_folder_btn.set_child(fo_inner)
-        add_folder_btn.set_tooltip_text("Scan seluruh folder secara rekursif")
-        add_folder_btn.connect("clicked", self._lib_add_folder)
-
-        add_box.append(add_file_btn)
-        add_box.append(add_folder_btn)
-
-        # Baris bawah: clear semua (kecil, di kanan)
-        clear_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        clear_row.set_halign(Gtk.Align.END)
+        # Clear row
+        clear_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        clear_row.set_margin_top(2)
         clear_btn = Gtk.Button(label="✕  Hapus Semua")
-        clear_btn.add_css_class("lib-clear-btn")
+        clear_btn.add_css_class("clear-btn")
         clear_btn.set_focusable(False)
         clear_btn.set_focus_on_click(False)
-        clear_btn.set_tooltip_text("Hapus semua lagu dari library")
+        clear_btn.set_halign(Gtk.Align.END)
+        clear_btn.set_hexpand(True)
         clear_btn.connect("clicked", self._lib_clear)
         clear_row.append(clear_btn)
+        btn_box.append(clear_row)
 
-        panel.append(add_box)
-        panel.append(clear_row)
+        panel.append(btn_box)
 
-        sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep2 = Gtk.Box(); sep2.add_css_class("hsep"); sep2.set_size_request(-1, 1)
         panel.append(sep2)
 
+        # ── Scrollable Track List ────────────────────────────────────────────
         scroll = Gtk.ScrolledWindow()
+        scroll.add_css_class("lib-scroll")
         scroll.set_vexpand(True)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
-        self.lib_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        self.lib_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self.lib_list.add_css_class("lib-list-inner")
+        self.lib_list.set_margin_start(8); self.lib_list.set_margin_end(8)
+        self.lib_list.set_margin_top(6); self.lib_list.set_margin_bottom(6)
+
         scroll.set_child(self.lib_list)
         panel.append(scroll)
 
         return panel
 
-    def _build_currency_card(self):
-        card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        card.add_css_class("card")
+    def _lib_action_btn(self, icon, text, callback):
+        btn = Gtk.Button()
+        btn.add_css_class("lib-add-btn")
+        btn.set_focusable(False)
+        btn.set_focus_on_click(False)
 
-        left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        left.set_size_request(220, -1)
+        inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        inner.set_margin_start(4); inner.set_margin_end(4)
+        ic = Gtk.Label(label=icon)
+        tx = Gtk.Label(label=text)
+        tx.set_halign(Gtk.Align.START)
+        tx.set_hexpand(True)
+        inner.append(ic)
+        inner.append(tx)
+        btn.set_child(inner)
+        btn.connect("clicked", callback)
+        return btn
 
-        sub_lbl = Gtk.Label(label="1 Dolar Amerika Serikat sama dengan")
-        sub_lbl.set_halign(Gtk.Align.START)
-        sub_lbl.add_css_class("dim")
-        sub_lbl.set_wrap(True)
+    # ═══════════════════════════════════════════════════════════
+    #  CURRENCY PANEL (kanan atas)
+    # ═══════════════════════════════════════════════════════════
+    def _build_currency_panel(self):
+        panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        panel.add_css_class("currency-panel")
+
+        # ── Info kiri ───────────────────────────────────────────────────────
+        info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        info.add_css_class("currency-info")
+        info.set_margin_start(18); info.set_margin_end(14)
+        info.set_margin_top(14); info.set_margin_bottom(14)
+        info.set_size_request(230, -1)
+
+        sub = Gtk.Label(label="1 Dolar Amerika Serikat sama dengan")
+        sub.add_css_class("muted-lbl")
+        sub.set_halign(Gtk.Align.START)
+        sub.set_wrap(True)
 
         self.rate_lbl = Gtk.Label()
+        self.rate_lbl.add_css_class("rate-big")
         self.rate_lbl.set_halign(Gtk.Align.START)
         self.rate_lbl.set_wrap(True)
-        self.rate_lbl.add_css_class("rate-display")
-        self.rate_lbl.add_css_class("mono")
         self._refresh_rate_lbl()
 
-        src_lbl = Gtk.Label(label="Kenangan Pahit · Keuangan Indonesia")
-        src_lbl.set_halign(Gtk.Align.START)
-        src_lbl.add_css_class("dim")
+        src = Gtk.Label(label="Kenangan Pahit · Keuangan Indonesia")
+        src.add_css_class("muted-lbl")
+        src.set_halign(Gtk.Align.START)
 
-        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        hsep = Gtk.Box(); hsep.add_css_class("hsep"); hsep.set_size_request(-1, 1)
 
-        grid = Gtk.Grid()
-        grid.set_row_spacing(6)
-        grid.set_column_spacing(8)
+        # Konverter
+        conv = Gtk.Grid()
+        conv.set_row_spacing(6)
+        conv.set_column_spacing(10)
 
         self.usd_entry = Gtk.Entry()
         self.usd_entry.set_text("1")
         self.usd_entry.add_css_class("conv-entry")
         usd_lbl = Gtk.Label(label="USD")
-        usd_lbl.add_css_class("dim")
+        usd_lbl.add_css_class("unit-lbl")
         usd_lbl.set_halign(Gtk.Align.START)
 
         self.idr_entry = Gtk.Entry()
         self.idr_entry.set_text(f"{self.idr_rate:,.2f}")
         self.idr_entry.add_css_class("conv-entry")
         idr_lbl = Gtk.Label(label="IDR")
-        idr_lbl.add_css_class("dim")
+        idr_lbl.add_css_class("unit-lbl")
         idr_lbl.set_halign(Gtk.Align.START)
 
-        grid.attach(self.usd_entry, 0, 0, 1, 1)
-        grid.attach(usd_lbl,       1, 0, 1, 1)
-        grid.attach(self.idr_entry, 0, 1, 1, 1)
-        grid.attach(idr_lbl,       1, 1, 1, 1)
+        conv.attach(self.usd_entry, 0, 0, 1, 1)
+        conv.attach(usd_lbl,       1, 0, 1, 1)
+        conv.attach(self.idr_entry, 0, 1, 1, 1)
+        conv.attach(idr_lbl,       1, 1, 1, 1)
 
         self.usd_entry.connect("changed", self._usd_changed)
         self.idr_entry.connect("changed", self._idr_changed)
 
         sarcs = Gtk.Label(label="Kejatuhan Mata Uang Rupiah Terparah Sepanjang Sejarah")
+        sarcs.add_css_class("sarcs-lbl")
         sarcs.set_halign(Gtk.Align.START)
-        sarcs.add_css_class("sarcasm-tag")
         sarcs.set_wrap(True)
 
-        for w in (sub_lbl, self.rate_lbl, src_lbl, sep, grid, sarcs):
-            left.append(w)
+        for w in (sub, self.rate_lbl, src, hsep, conv, sarcs):
+            info.append(w)
 
-        self.chart = IDRChart(self.theme)
+        # ── Chart kanan ─────────────────────────────────────────────────────
+        chart_side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        chart_side.add_css_class("chart-side")
+        chart_side.set_hexpand(True)
+        chart_side.set_margin_top(12); chart_side.set_margin_bottom(10)
+        chart_side.set_margin_end(14)
 
-        chart_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        tab_row   = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        # Time range tabs
+        tab_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
         tab_row.set_halign(Gtk.Align.END)
-        for lbl_t in ("1DTK", "1HR", "5HR", "1BLN", "1TH", "5TH", "Maks"):
-            b = Gtk.Button(label=lbl_t)
-            b.add_css_class("tab-pill")
-            if lbl_t == "1DTK":
+        for t in ("1DTK", "1HR", "5HR", "1BLN", "1TH", "5TH", "Maks"):
+            b = Gtk.Button(label=t)
+            b.add_css_class("time-tab")
+            if t == "1DTK":
                 b.add_css_class("active")
+            b.set_focusable(False)
+            b.set_focus_on_click(False)
             tab_row.append(b)
 
-        chart_box.append(tab_row)
-        chart_box.append(self.chart)
-        chart_box.set_hexpand(True)
+        self.chart = IDRChart(self.theme)
+        self.chart.set_vexpand(True)
 
-        card.append(left)
-        card.append(chart_box)
-        return card
+        chart_side.append(tab_row)
+        chart_side.append(self.chart)
 
-    def _build_spectrum_card(self):
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        card.add_css_class("card")
+        vsep = Gtk.Box(); vsep.add_css_class("vsep"); vsep.set_size_request(1, -1)
 
-        # Header row — HANYA label + view tabs + toggle icon
+        panel.append(info)
+        panel.append(vsep)
+        panel.append(chart_side)
+
+        return panel
+
+    # ═══════════════════════════════════════════════════════════
+    #  SPECTRUM PANEL (kanan bawah)
+    # ═══════════════════════════════════════════════════════════
+    def _build_spectrum_panel(self):
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        panel.add_css_class("spec-panel")
+        panel.set_vexpand(True)
+
+        # Header
         hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        hdr.add_css_class("spec-header")
+        hdr.set_margin_start(14); hdr.set_margin_end(10)
+        hdr.set_margin_top(8); hdr.set_margin_bottom(8)
 
         spec_lbl = Gtk.Label(label="SPEKTRUM")
-        spec_lbl.add_css_class("section-title")
-        spec_lbl.add_css_class("mono")
+        spec_lbl.add_css_class("section-cap")
         spec_lbl.set_hexpand(True)
         spec_lbl.set_halign(Gtk.Align.START)
 
@@ -341,7 +363,7 @@ class WindowUIMixin:
         self._view_btns = {}
         for mode in ("BASS", "MID", "FULL", "WAVE", "MAKS"):
             b = Gtk.Button(label=mode)
-            b.add_css_class("tab-pill")
+            b.add_css_class("view-tab")
             b.set_focusable(False)
             b.set_focus_on_click(False)
             if mode == "FULL":
@@ -350,9 +372,8 @@ class WindowUIMixin:
             tab_row.append(b)
             self._view_btns[mode] = b
 
-        # Toggle spektrum — ICON saja, bukan teks panjang
         self.hide_spec_btn = Gtk.Button(label="⊟")
-        self.hide_spec_btn.add_css_class("icon-btn")
+        self.hide_spec_btn.add_css_class("icon-pill")
         self.hide_spec_btn.set_tooltip_text("Tampilkan/Sembunyikan spektrum  [H]")
         self.hide_spec_btn.set_focusable(False)
         self.hide_spec_btn.set_focus_on_click(False)
@@ -361,46 +382,97 @@ class WindowUIMixin:
         hdr.append(spec_lbl)
         hdr.append(tab_row)
         hdr.append(self.hide_spec_btn)
-        card.append(hdr)
+        panel.append(hdr)
 
-        # Visualizer — hanya ini yang disembunyikan, bukan card-nya
+        hsep = Gtk.Box(); hsep.add_css_class("hsep"); hsep.set_size_request(-1, 1)
+        panel.append(hsep)
+
+        # Visualizer dengan revealer
         self.viz = SpectrumVisualizer(self.theme)
+        self.viz.set_vexpand(True)
+        self.viz.set_margin_start(6); self.viz.set_margin_end(6)
+        self.viz.set_margin_top(6); self.viz.set_margin_bottom(4)
+
         self._viz_revealer = Gtk.Revealer()
         self._viz_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_UP)
         self._viz_revealer.set_transition_duration(200)
         self._viz_revealer.set_reveal_child(True)
+        self._viz_revealer.set_vexpand(True)
         self._viz_revealer.set_child(self.viz)
-        card.append(self._viz_revealer)
+        panel.append(self._viz_revealer)
 
-        return card
+        return panel
 
+    # ═══════════════════════════════════════════════════════════
+    #  PLAYER BAR (bawah, full-width)
+    # ═══════════════════════════════════════════════════════════
     def _build_player_bar(self):
-        bar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        bar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         bar.add_css_class("player-bar")
 
-        ctrl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        # ── Track info row ───────────────────────────────────────────────────
+        track_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        track_row.set_margin_start(14); track_row.set_margin_end(14)
+        track_row.set_margin_top(8)
 
-        # ── Album Art / Music Icon ──
+        # Album art
         self._album_art = Gtk.DrawingArea()
-        self._album_art.set_size_request(44, 44)
+        self._album_art.set_size_request(42, 42)
         self._album_art.set_draw_func(self._draw_album_art)
-        self._album_art_pixbuf = None  # None = pakai default SVG
-        ctrl.append(self._album_art)
+        self._album_art_pixbuf = None
+        track_row.append(self._album_art)
+
+        # Track label
+        self.track_lbl = Gtk.Label(label="// tidak ada file yang dipilih")
+        self.track_lbl.add_css_class("track-label")
+        self.track_lbl.set_halign(Gtk.Align.START)
+        self.track_lbl.set_hexpand(True)
+        self.track_lbl.set_ellipsize(3)
+        track_row.append(self.track_lbl)
+
+        bar.append(track_row)
+
+        # ── Seek row ─────────────────────────────────────────────────────────
+        seek_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        seek_row.set_margin_start(14); seek_row.set_margin_end(14)
+        seek_row.set_margin_top(6)
+
+        self.seek_bar = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
+        self.seek_bar.set_range(0, 100)
+        self.seek_bar.set_draw_value(False)
+        self.seek_bar.set_hexpand(True)
+        self.seek_bar.set_focusable(False)
+        self.seek_bar.set_focus_on_click(False)
+        self.seek_bar.set_tooltip_text("Posisi lagu  [← / → untuk ±5 detik]")
+        self.seek_bar.add_css_class("seek-scale")
+        self.seek_bar.connect("change-value", self._on_seek)
+
+        self.time_lbl = Gtk.Label(label="0:00 / 0:00")
+        self.time_lbl.set_width_chars(13)
+        self.time_lbl.add_css_class("time-lbl")
+
+        seek_row.append(self.seek_bar)
+        seek_row.append(self.time_lbl)
+        bar.append(seek_row)
+
+        # ── Controls row ──────────────────────────────────────────────────────
+        ctrl = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        ctrl.set_margin_start(14); ctrl.set_margin_end(14)
+        ctrl.set_margin_top(6); ctrl.set_margin_bottom(10)
 
         def _nb(btn):
-            # Non-focusable button — klik tidak steal keyboard focus.
             btn.set_focusable(False)
             btn.set_focus_on_click(False)
             return btn
 
         open_btn = _nb(Gtk.Button(label="☰"))
         open_btn.add_css_class("ctrl-btn")
-        open_btn.set_tooltip_text("Buka file musik  [Ctrl+O]")
+        open_btn.set_tooltip_text("Buka file  [Ctrl+O]")
         open_btn.connect("clicked", self._open_file)
 
         self.prev_btn = _nb(Gtk.Button(label="⏮"))
         self.prev_btn.add_css_class("ctrl-btn")
-        self.prev_btn.set_tooltip_text("Lagu sebelumnya  [Ctrl+←]")
+        self.prev_btn.set_tooltip_text("Sebelumnya  [Ctrl+←]")
         self.prev_btn.connect("clicked", self._prev_track)
 
         self.play_btn = _nb(Gtk.Button(label="▶"))
@@ -411,7 +483,7 @@ class WindowUIMixin:
 
         self.next_btn = _nb(Gtk.Button(label="⏭"))
         self.next_btn.add_css_class("ctrl-btn")
-        self.next_btn.set_tooltip_text("Lagu berikutnya  [Ctrl+→]")
+        self.next_btn.set_tooltip_text("Berikutnya  [Ctrl+→]")
         self.next_btn.connect("clicked", self._next_track)
 
         self.shuffle_btn = _nb(Gtk.Button(label="⇄"))
@@ -424,48 +496,41 @@ class WindowUIMixin:
         self.repeat_btn.set_tooltip_text("Repeat  [R]")
         self.repeat_btn.connect("clicked", self._toggle_repeat)
 
-        self.seek_bar = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
-        self.seek_bar.set_range(0, 100)
-        self.seek_bar.set_draw_value(False)
-        self.seek_bar.set_hexpand(True)
-        self.seek_bar.set_focusable(False)
-        self.seek_bar.set_focus_on_click(False)
-        self.seek_bar.set_tooltip_text("Posisi lagu  [← / → untuk ±5 detik]")
-        self.seek_bar.connect("change-value", self._on_seek)
-
-        self.time_lbl = Gtk.Label(label="0:00 / 0:00")
-        self.time_lbl.set_width_chars(13)
-        self.time_lbl.add_css_class("dim")
-        self.time_lbl.add_css_class("mono")
+        # Spacer
+        spacer = Gtk.Box()
+        spacer.set_hexpand(True)
 
         vol_lbl = Gtk.Label(label="Vol")
-        vol_lbl.add_css_class("dim")
+        vol_lbl.add_css_class("muted-lbl")
+
         self.vol_bar = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
         self.vol_bar.set_range(0, 1)
         self.vol_bar.set_value(1.0)
         self.vol_bar.set_draw_value(False)
-        self.vol_bar.set_size_request(70, -1)
+        self.vol_bar.set_size_request(80, -1)
         self.vol_bar.set_focusable(False)
         self.vol_bar.set_focus_on_click(False)
         self.vol_bar.set_tooltip_text("Volume  [Ctrl+↑ / Ctrl+↓]")
+        self.vol_bar.add_css_class("vol-scale")
         self.vol_bar.connect("value-changed", self._on_vol)
 
         for w in (open_btn, self.prev_btn, self.play_btn, self.next_btn,
                   self.shuffle_btn, self.repeat_btn,
-                  self.seek_bar, self.time_lbl, vol_lbl, self.vol_bar):
+                  spacer, vol_lbl, self.vol_bar):
             ctrl.append(w)
 
         bar.append(ctrl)
         return bar
 
+    # ═══════════════════════════════════════════════════════════
+    #  ALBUM ART DRAW
+    # ═══════════════════════════════════════════════════════════
     def _draw_album_art(self, _w, cr, width, height):
-        """Gambar album art atau default music icon."""
         import math as _m
         r = min(width, height) / 2
         cx, cy = width / 2, height / 2
 
         if self._album_art_pixbuf is not None:
-            # Album art dari metadata — tampilkan sebagai kotak (bukan lingkaran)
             from gi.repository import GdkPixbuf
             pb = self._album_art_pixbuf
             scale = min(width / pb.get_width(), height / pb.get_height())
@@ -474,8 +539,7 @@ class WindowUIMixin:
             ox = (width - sw) / 2
             oy = (height - sh) / 2
             cr.save()
-            # Clip kotak dengan sudut sedikit rounded
-            radius = 4.0
+            radius = 5.0
             cr.new_sub_path()
             cr.arc(radius, radius, radius, _m.pi, 3 * _m.pi / 2)
             cr.arc(width - radius, radius, radius, 3 * _m.pi / 2, 0)
@@ -488,8 +552,7 @@ class WindowUIMixin:
             Gdk.cairo_set_source_pixbuf(cr, pb, ox / scale, oy / scale)
             cr.paint()
             cr.restore()
-            # Border tipis kotak
-            cr.set_source_rgba(1, 1, 1, 0.12)
+            cr.set_source_rgba(1, 1, 1, 0.10)
             cr.set_line_width(1.0)
             cr.new_sub_path()
             cr.arc(radius, radius, radius, _m.pi, 3 * _m.pi / 2)
@@ -499,30 +562,21 @@ class WindowUIMixin:
             cr.close_path()
             cr.stroke()
         else:
-            # Default music icon — vinyl disc style
-            t = self.theme
-            # Outer disc
+            # Vinyl default
             cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
             cr.set_source_rgb(0.10, 0.11, 0.13)
             cr.fill()
-            # Grooves
             for ri in [r * 0.85, r * 0.70, r * 0.55]:
                 cr.arc(cx, cy, ri, 0, 2 * _m.pi)
                 cr.set_source_rgba(1, 1, 1, 0.04)
                 cr.set_line_width(1)
                 cr.stroke()
-            # Center label
             cr.arc(cx, cy, r * 0.38, 0, 2 * _m.pi)
-            if self.is_dark:
-                cr.set_source_rgb(0.11, 0.18, 0.38)
-            else:
-                cr.set_source_rgb(0.18, 0.31, 0.72)
+            cr.set_source_rgb(0.11, 0.18, 0.38 if self.is_dark else 0.72)
             cr.fill()
-            # Center dot
             cr.arc(cx, cy, r * 0.10, 0, 2 * _m.pi)
             cr.set_source_rgb(0.06, 0.06, 0.07)
             cr.fill()
-            # Music note
             cr.set_source_rgba(0.48, 0.67, 1.0, 0.85)
             cr.set_font_size(r * 0.40)
             cr.select_font_face("sans-serif", 0, 0)
@@ -530,15 +584,12 @@ class WindowUIMixin:
             cr.move_to(cx - ext.width / 2 - ext.x_bearing,
                        cy - ext.height / 2 - ext.y_bearing)
             cr.show_text("♫")
-            # Border ring
             cr.arc(cx, cy, r - 1, 0, 2 * _m.pi)
             cr.set_source_rgba(1, 1, 1, 0.08)
             cr.set_line_width(1.5)
             cr.stroke()
 
     def _update_album_art(self, idx: int):
-        """Load album art untuk track idx, update DrawingArea."""
-        from gi.repository import GdkPixbuf, GLib as _GL
         self._album_art_pixbuf = None
         raw = self.library.get_cover_bytes(idx)
         if raw:
@@ -553,7 +604,9 @@ class WindowUIMixin:
                 pass
         self._album_art.queue_draw()
 
-    # ── Library Actions ───────────────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════
+    #  LIBRARY ACTIONS
+    # ═══════════════════════════════════════════════════════════
     def _lib_add_file(self, _btn):
         dialog = Gtk.FileChooserDialog(
             title="Pilih File Musik",
@@ -563,7 +616,6 @@ class WindowUIMixin:
         dialog.set_select_multiple(True)
         dialog.add_button("Batal",    Gtk.ResponseType.CANCEL)
         dialog.add_button("▶  Tambah", Gtk.ResponseType.ACCEPT)
-
         af = Gtk.FileFilter()
         af.set_name("File Audio")
         for ext in AUDIO_EXTS:
@@ -574,8 +626,7 @@ class WindowUIMixin:
 
     def _files_chosen(self, dialog, response):
         if response == Gtk.ResponseType.ACCEPT:
-            files = dialog.get_files()
-            for f in files:
+            for f in dialog.get_files():
                 self.library.add(f.get_path())
             self._refresh_library_ui()
             save_config(self._build_current_config())
@@ -612,11 +663,8 @@ class WindowUIMixin:
             nxt = child.get_next_sibling()
             self.lib_list.remove(child)
             child = nxt
-
         for i, path in enumerate(self.library.tracks):
-            row = self._make_lib_row(i, path)
-            self.lib_list.append(row)
-
+            self.lib_list.append(self._make_lib_row(i, path))
         self.lib_count_lbl.set_text(f"{len(self.library)} lagu")
 
     def _make_lib_row(self, idx: int, path: str):
@@ -635,7 +683,7 @@ class WindowUIMixin:
         name.set_ellipsize(3)
 
         del_btn = Gtk.Button(label="✕")
-        del_btn.add_css_class("ctrl-btn")
+        del_btn.add_css_class("del-btn")
         del_btn.set_focusable(False)
         del_btn.set_focus_on_click(False)
         del_btn.connect("clicked", self._lib_remove, idx)
@@ -647,7 +695,6 @@ class WindowUIMixin:
         gesture = Gtk.GestureClick()
         gesture.connect("released", self._lib_row_clicked, idx)
         row.add_controller(gesture)
-
         return row
 
     def _lib_row_clicked(self, _gesture, _n, _x, _y, idx):
@@ -662,13 +709,14 @@ class WindowUIMixin:
         self._refresh_library_ui()
         save_config(self._build_current_config())
 
-    # ── Playback ──────────────────────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════
+    #  PLAYBACK CONTROLS
+    # ═══════════════════════════════════════════════════════════
     def _play_index(self, idx: int):
         if idx < 0 or idx >= len(self.library):
             return
         self.current_idx = idx
-        path = self.library.tracks[idx]
-        self._load(path)
+        self._load(self.library.tracks[idx])
         self._do_play()
         self._refresh_library_ui()
         self._update_album_art(idx)
@@ -677,16 +725,12 @@ class WindowUIMixin:
     def _prev_track(self, _btn=None):
         n = len(self.library)
         if n == 0: return
-        idx = (self.current_idx - 1) % n
-        self._play_index(idx)
+        self._play_index((self.current_idx - 1) % n)
 
     def _next_track(self, _btn=None):
         n = len(self.library)
         if n == 0: return
-        if self.shuffle:
-            idx = random.randint(0, n - 1)
-        else:
-            idx = (self.current_idx + 1) % n
+        idx = random.randint(0, n - 1) if self.shuffle else (self.current_idx + 1) % n
         self._play_index(idx)
 
     def _toggle_shuffle(self, _btn):
@@ -731,11 +775,8 @@ class WindowUIMixin:
 
     def _open_settings(self, _btn):
         dlg = SettingsDialog(
-            self,
-            self._spec_color,
-            self._chart_color,
-            self._on_spec_color_changed,
-            self._on_chart_color_changed,
+            self, self._spec_color, self._chart_color,
+            self._on_spec_color_changed, self._on_chart_color_changed,
         )
         dlg.present()
 
@@ -758,20 +799,13 @@ class WindowUIMixin:
     def _load(self, path: str):
         self.current_file = path
         self.pipeline.set_state(Gst.State.NULL)
-        # filesrc.location harus berupa path filesystem biasa — BUKAN URI.
-        # Pada Windows, Path.as_posix() menghasilkan forward-slash yang
-        # diterima GStreamer filesrc di MSYS2/MinGW tanpa encoding %20.
-        # Jangan pakai Gst.filename_to_uri() di sini karena itu menghasilkan
-        # URI (file:///) yang tidak diterima oleh property "location" filesrc.
-        location = Path(path).as_posix()
-        self.src.set_property("location", location)
+        self.src.set_property("location", Path(path).as_posix())
         self.pipeline.set_state(Gst.State.PAUSED)
         self.is_playing = False
         self.play_btn.set_label("▶")
         self.play_btn.set_sensitive(True)
         fname = os.path.basename(path)
         self.track_lbl.set_text(f"// {fname}")
-        # Update window title — muncul di taskbar
         self.set_title(f"♫ {os.path.splitext(fname)[0]} — IDR Spectrum")
         self.duration_ns = 0
         GLib.timeout_add(300, self._query_duration)
@@ -800,9 +834,8 @@ class WindowUIMixin:
             action=Gtk.FileChooserAction.OPEN,
         )
         dialog.set_transient_for(self)
-        dialog.add_button("Batal",     Gtk.ResponseType.CANCEL)
-        dialog.add_button("▶  Buka",  Gtk.ResponseType.ACCEPT)
-
+        dialog.add_button("Batal",   Gtk.ResponseType.CANCEL)
+        dialog.add_button("▶  Buka", Gtk.ResponseType.ACCEPT)
         af = Gtk.FileFilter()
         af.set_name("File Audio")
         for ext in AUDIO_EXTS:
@@ -824,11 +857,10 @@ class WindowUIMixin:
     def _on_seek(self, _scale, _scroll_type, value):
         if self._upd_pos: return False
         if self.duration_ns > 0:
-            pos = int(value / 100 * self.duration_ns)
             self.pipeline.seek_simple(
                 Gst.Format.TIME,
                 Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT,
-                pos,
+                int(value / 100 * self.duration_ns),
             )
         return False
 
@@ -842,7 +874,9 @@ class WindowUIMixin:
         self.viz.view_mode = mode
         self.viz.queue_draw()
 
-    # ── Currency Helpers ──────────────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════
+    #  CURRENCY HELPERS
+    # ═══════════════════════════════════════════════════════════
     def _refresh_rate_lbl(self):
         self.rate_lbl.set_text(f"Rp{self.idr_rate:,.2f}\nRupiah Indonesia")
 

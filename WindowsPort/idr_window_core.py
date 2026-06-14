@@ -226,43 +226,466 @@ class WindowCore(Gtk.ApplicationWindow):
     def _build_css(self):
         t = self.theme
         return f"""
-        window {{
+        /* ── Base ──────────────────────────────────────────────────────────── */
+        window, .background {{
             background-color: {t['window_bg']};
             color: {t['text_primary']};
             font-family: 'IBM Plex Sans', 'Noto Sans', 'Segoe UI', Arial, sans-serif;
         }}
-        .card {{
-            background-color: {t['card_bg']};
-            border-radius: 14px;
-            padding: 16px;
-            border: 1px solid {t['card_border']};
-        }}
-        .rate-display {{
-            font-size: 28px;
-            font-weight: 700;
-            color: {t['text_primary']};
-            letter-spacing: -0.03em;
-            line-height: 1.2;
-        }}
+        /* ── Typography helpers ────────────────────────────────────────────── */
         .mono {{
             font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
         }}
-        .dim {{
+
+        /* ── HeaderBar ─────────────────────────────────────────────────────── */
+        headerbar,
+        .app-header {{
+            background-color: {t['card_bg']};
+            color: {t['text_primary']};
+            border-bottom: 1px solid {t['card_border']};
+            box-shadow: none;
+            min-height: 46px;
+            padding: 0 8px;
+        }}
+        headerbar label,
+        headerbar .title {{
+            color: {t['text_primary']};
+        }}
+        .header-icon {{
+            font-size: 15px;
+            color: {t['tab_active_fg']};
+        }}
+        .header-title {{
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            color: {t['text_muted']};
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+        }}
+        .hdr-btn {{
+            background: none;
+            border: 1px solid {t['ctrl_border']};
+            color: {t['ctrl_fg']};
+            border-radius: 8px;
+            min-width: 32px;
+            min-height: 28px;
+            padding: 0 8px;
+            font-size: 14px;
+            box-shadow: none;
+            outline: none;
+        }}
+        .hdr-btn:hover {{
+            background-color: {t['entry_bg']};
+            color: {t['text_primary']};
+            border-color: {t['entry_border']};
+        }}
+        .hdr-btn:focus {{
+            box-shadow: none;
+            outline: none;
+        }}
+
+        /* ── Separator helpers ─────────────────────────────────────────────── */
+        .vsep {{
+            background-color: {t['card_border']};
+            min-width: 1px;
+        }}
+        .hsep {{
+            background-color: {t['card_border']};
+            min-height: 1px;
+        }}
+        separator {{
+            background-color: {t['sep_color']};
+            min-height: 1px;
+            min-width: 1px;
+        }}
+
+        /* ── Library Panel ─────────────────────────────────────────────────── */
+        .lib-panel {{
+            background-color: {t['card_bg']};
+        }}
+        .lib-header {{
+            background-color: {t['card_bg']};
+        }}
+        .section-cap {{
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.13em;
+            color: {t['text_muted']};
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+        }}
+        .muted-lbl {{
             font-size: 11px;
             color: {t['text_muted']};
+        }}
+        .lib-add-btn {{
+            background-color: {t['entry_bg']};
+            border: 1px solid {t['entry_border']};
+            border-radius: 8px;
+            padding: 7px 10px;
+            color: {t['text_primary']};
+            font-size: 12px;
+        }}
+        .lib-add-btn label {{
+            color: {t['text_primary']};
+        }}
+        .lib-add-btn:hover {{
+            background-color: {t['list_item_hover']};
+            border-color: {t['tab_active_bd']};
+        }}
+        .lib-add-btn:hover label {{
+            color: {t['tab_active_fg']};
+        }}
+        .clear-btn {{
+            background: none;
+            border: none;
+            color: {t['text_muted']};
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }}
+        .clear-btn:hover {{
+            color: #e05555;
+            background-color: rgba(224,85,85,0.10);
+        }}
+        .lib-scroll {{
+            background-color: {t['list_bg']};
+            border: none;
+        }}
+        .lib-list-inner {{
+            background-color: {t['list_bg']};
+        }}
+        .lib-row {{
+            background-color: {t['list_item_bg']};
+            border-radius: 8px;
+            padding: 6px 8px;
+            border: 1px solid {t['card_border']};
+        }}
+        .lib-row:hover {{
+            background-color: {t['list_item_hover']};
+            border-color: {t['entry_border']};
+        }}
+        .lib-row-active {{
+            background-color: {t['list_sel_bg']};
+            border-color: {t['tab_active_bd']};
+        }}
+        .lib-row label {{
+            color: {t['text_primary']};
+        }}
+        .lib-row-active label {{
+            color: {t['list_sel_fg']};
+        }}
+        .lib-num {{
+            font-size: 10px;
+            color: {t['text_muted']};
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+            min-width: 22px;
+        }}
+        .lib-name {{
+            font-size: 12px;
+            color: {t['text_primary']};
+        }}
+        .del-btn {{
+            background: none;
+            border: none;
+            color: {t['text_dim']};
+            font-size: 10px;
+            padding: 0 3px;
+            border-radius: 4px;
+            min-width: 18px;
+            min-height: 18px;
+        }}
+        .del-btn:hover {{
+            color: #e05555;
+            background-color: rgba(224,85,85,0.10);
+        }}
+
+        /* ── Currency Panel ────────────────────────────────────────────────── */
+        .currency-panel {{
+            background-color: {t['window_bg']};
+        }}
+        .currency-info {{
+            background-color: {t['window_bg']};
+        }}
+        .rate-big {{
+            font-size: 26px;
+            font-weight: 700;
+            color: {t['text_primary']};
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            font-family: 'IBM Plex Sans', 'Noto Sans', 'Segoe UI', Arial, sans-serif;
+        }}
+        .sarcs-lbl {{
+            font-size: 9px;
+            color: {t['sarcasm']};
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+            letter-spacing: 0.05em;
+            font-style: italic;
+        }}
+        .unit-lbl {{
+            font-size: 11px;
+            font-weight: 600;
+            color: {t['text_muted']};
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
         }}
         .conv-entry {{
             background-color: {t['entry_bg']};
             color: {t['entry_text']};
             border: 1px solid {t['entry_border']};
             border-radius: 8px;
-            padding: 6px 10px;
-            min-width: 100px;
+            padding: 5px 10px;
+            min-width: 110px;
             font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
             font-size: 13px;
+            caret-color: {t['text_primary']};
+            box-shadow: none;
         }}
         .conv-entry:focus {{
             border-color: {t['tab_active_bd']};
+            box-shadow: none;
+        }}
+        .chart-side {{
+            background-color: {t['window_bg']};
+        }}
+        .time-tab {{
+            background: none;
+            border: 1px solid transparent;
+            color: {t['text_muted']};
+            padding: 3px 8px;
+            border-radius: 16px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+        }}
+        .time-tab:hover {{
+            color: {t['text_primary']};
+            border-color: {t['card_border']};
+            background-color: {t['entry_bg']};
+        }}
+        .time-tab.active {{
+            background-color: {t['tab_active_bg']};
+            border-color: {t['tab_active_bd']};
+            color: {t['tab_active_fg']};
+        }}
+
+        /* ── Spectrum Panel ────────────────────────────────────────────────── */
+        .spec-panel {{
+            background-color: {t['spec_bg']};
+        }}
+        .spec-header {{
+            background-color: {t['spec_bg']};
+        }}
+        .view-tab {{
+            background: none;
+            border: 1px solid transparent;
+            color: {t['text_muted']};
+            padding: 3px 9px;
+            border-radius: 16px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+        }}
+        .view-tab:hover {{
+            color: {t['text_primary']};
+            border-color: {t['card_border']};
+            background-color: {t['entry_bg']};
+        }}
+        .view-tab.active {{
+            background-color: {t['tab_active_bg']};
+            border-color: {t['tab_active_bd']};
+            color: {t['tab_active_fg']};
+        }}
+        .icon-pill {{
+            background: none;
+            border: 1px solid {t['ctrl_border']};
+            color: {t['ctrl_fg']};
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 13px;
+            min-width: 28px;
+            min-height: 26px;
+        }}
+        .icon-pill:hover {{
+            background-color: {t['entry_bg']};
+            color: {t['text_primary']};
+            border-color: {t['entry_border']};
+        }}
+        .icon-pill.active {{
+            background-color: {t['tab_active_bg']};
+            border-color: {t['tab_active_bd']};
+            color: {t['tab_active_fg']};
+        }}
+
+        /* ── Player Bar ────────────────────────────────────────────────────── */
+        .player-bar {{
+            background-color: {t['bar_bg']};
+            border-top: 1px solid {t['bar_border']};
+        }}
+        .track-label {{
+            font-size: 12px;
+            color: {t['track_color']};
+            font-style: italic;
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+        }}
+        .time-lbl {{
+            font-size: 11px;
+            color: {t['text_muted']};
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
+            min-width: 100px;
+        }}
+
+        /* ── Scale (seek + volume) ─────────────────────────────────────────── */
+        .seek-scale trough,
+        .seek-scale > trough,
+        .vol-scale trough,
+        .vol-scale > trough,
+        scale trough,
+        scale > trough {{
+            background-color: {t['scale_trough']};
+            min-height: 3px;
+            border-radius: 2px;
+        }}
+        .seek-scale highlight,
+        .seek-scale > trough > highlight,
+        .vol-scale highlight,
+        .vol-scale > trough > highlight,
+        scale highlight,
+        scale > trough > highlight {{
+            background-color: {t['scale_hl']};
+            border-radius: 2px;
+        }}
+        .seek-scale slider,
+        .seek-scale > trough > slider,
+        .vol-scale slider,
+        .vol-scale > trough > slider,
+        scale slider,
+        scale > trough > slider {{
+            background-color: {t['scale_slider']};
+            border-radius: 50%;
+            min-width: 12px;
+            min-height: 12px;
+            border: none;
+            box-shadow: none;
+        }}
+
+        /* ── Ctrl + Play buttons ───────────────────────────────────────────── */
+        .ctrl-btn {{
+            background: none;
+            border: 1px solid {t['ctrl_border']};
+            color: {t['ctrl_fg']};
+            border-radius: 8px;
+            min-width: 34px;
+            min-height: 34px;
+            padding: 0;
+            font-size: 14px;
+        }}
+        .ctrl-btn:hover {{
+            background-color: {t['entry_bg']};
+            color: {t['text_primary']};
+            border-color: {t['entry_border']};
+        }}
+        .ctrl-btn.active {{
+            background-color: {t['tab_active_bg']};
+            border-color: {t['tab_active_bd']};
+            color: {t['tab_active_fg']};
+        }}
+        .play-btn {{
+            background-color: {t['play_bg']};
+            border: 1px solid {t['play_border']};
+            color: {t['play_fg']};
+            border-radius: 50%;
+            min-width: 44px;
+            min-height: 44px;
+            padding: 0;
+            font-size: 16px;
+        }}
+        .play-btn:hover {{
+            background-color: {t['tab_active_bg']};
+            border-color: {t['play_border']};
+            color: {t['text_primary']};
+        }}
+        .play-btn:disabled {{
+            background-color: {t['entry_bg']};
+            border-color: {t['ctrl_border']};
+            color: {t['text_dim']};
+            opacity: 0.5;
+        }}
+
+        /* ── Popover & MenuButton ──────────────────────────────────────────── */
+        menubutton button,
+        menubutton > button {{
+            background: none;
+            border: 1px solid {t['ctrl_border']};
+            color: {t['ctrl_fg']};
+            border-radius: 8px;
+            min-width: 32px;
+            min-height: 28px;
+            padding: 0 8px;
+            font-size: 14px;
+            box-shadow: none;
+            outline: none;
+        }}
+        menubutton button:hover {{
+            background-color: {t['entry_bg']};
+            color: {t['text_primary']};
+            border-color: {t['entry_border']};
+        }}
+        menubutton button:active,
+        menubutton button:checked {{
+            background-color: {t['entry_bg']};
+            box-shadow: none;
+        }}
+        menubutton button:focus {{
+            box-shadow: none;
+            outline: none;
+        }}
+        popover contents,
+        popover > contents {{
+            background-color: {t['card_bg']};
+            border: 1px solid {t['card_border']};
+            border-radius: 10px;
+            padding: 4px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+        }}
+        .pop-item {{
+            background: none;
+            border: none;
+            border-radius: 6px;
+            color: {t['text_primary']};
+            padding: 8px 14px;
+            font-size: 12px;
+            min-width: 190px;
+        }}
+        .pop-item label {{
+            color: {t['text_primary']};
+        }}
+        .pop-item:hover {{
+            background-color: {t['list_item_hover']};
+        }}
+        .pop-item:active {{
+            background-color: {t['tab_active_bg']};
+            color: {t['tab_active_fg']};
+        }}
+
+        /* ── Dialog ────────────────────────────────────────────────────────── */
+        dialog {{
+            background-color: {t['window_bg']};
+            color: {t['text_primary']};
+        }}
+        dialog > .dialog-vbox,
+        dialog .dialog-vbox,
+        dialog contents,
+        dialog > contents {{
+            background-color: {t['window_bg']};
+            color: {t['text_primary']};
+        }}
+        .section-title {{
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: {t['text_muted']};
+            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
         }}
         .tab-pill {{
             background: none;
@@ -284,295 +707,24 @@ class WindowCore(Gtk.ApplicationWindow):
             border-color: {t['tab_active_bd']};
             color: {t['tab_active_fg']};
         }}
-        .player-bar {{
-            background-color: {t['bar_bg']};
-            border-radius: 12px;
-            padding: 10px 14px;
-            border: 1px solid {t['bar_border']};
-        }}
-        .ctrl-btn {{
-            background: none;
-            border: 1px solid {t['ctrl_border']};
-            color: {t['ctrl_fg']};
-            border-radius: 8px;
-            min-width: 34px;
-            min-height: 34px;
-            padding: 0;
-            font-size: 14px;
-        }}
-        .ctrl-btn:hover {{
-            background-color: {t['entry_bg']};
-            color: {t['text_primary']};
-            border-color: {t['entry_border']};
-        }}
-        .ctrl-btn.active {{
-            background-color: {t['tab_active_bg']};
-            border-color: {t['tab_active_bd']};
-            color: {t['tab_active_fg']};
-        }}
-        .icon-btn {{
-            background: none;
-            border: 1px solid {t['ctrl_border']};
-            color: {t['ctrl_fg']};
-            border-radius: 8px;
-            min-width: 30px;
-            min-height: 28px;
-            padding: 0 6px;
-            font-size: 15px;
-        }}
-        .icon-btn:hover {{
-            background-color: {t['entry_bg']};
-            color: {t['text_primary']};
-            border-color: {t['entry_border']};
-        }}
-        .icon-btn.active {{
-            background-color: {t['tab_active_bg']};
-            border-color: {t['tab_active_bd']};
-            color: {t['tab_active_fg']};
-        }}
-        .play-btn {{
-            background-color: {t['play_bg']};
-            border: 1px solid {t['play_border']};
-            color: {t['play_fg']};
-            border-radius: 50%;
-            min-width: 42px;
-            min-height: 42px;
-            padding: 0;
-            font-size: 16px;
-        }}
-        .play-btn:hover {{
-            background-color: {t['tab_active_bg']};
-            color: {t['text_primary']};
-        }}
-        .track-label {{
+        .dim {{
             font-size: 11px;
-            color: {t['track_color']};
-            font-style: italic;
-        }}
-        .sarcasm-tag {{
-            font-size: 10px;
-            color: {t['sarcasm']};
-            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
-            letter-spacing: 0.06em;
-        }}
-        scale trough,
-        scale > trough {{
-            background-color: {t['scale_trough']};
-            min-height: 3px;
-            border-radius: 2px;
-        }}
-        scale highlight,
-        scale > trough > highlight {{
-            background-color: {t['scale_hl']};
-            border-radius: 2px;
-        }}
-        scale slider,
-        scale > trough > slider {{
-            background-color: {t['scale_slider']};
-            border-radius: 50%;
-            min-width: 11px;
-            min-height: 11px;
-            border: none;
-            box-shadow: none;
-        }}
-        .lib-row {{
-            background-color: {t['list_item_bg']};
-            border-radius: 8px;
-            padding: 6px 10px;
-            border: 1px solid {t['card_border']};
-        }}
-        .lib-row:hover {{
-            background-color: {t['list_item_hover']};
-        }}
-        .lib-row-active {{
-            background-color: {t['list_sel_bg']};
-            border-color: {t['tab_active_bd']};
-        }}
-        .lib-row label {{
-            color: {t['text_primary']};
-        }}
-        .lib-row-active label {{
-            color: {t['list_sel_fg']};
-        }}
-        .lib-num {{
-            font-size: 10px;
-            color: {t['text_muted']};
-            font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace;
-            min-width: 22px;
-        }}
-        .lib-name {{
-            font-size: 12px;
-        }}
-        .section-title {{
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.12em;
             color: {t['text_muted']};
         }}
-        .separator {{
-            background-color: {t['sep_color']};
-            min-height: 1px;
-        }}
-        .theme-btn {{
-            background: none;
-            border: 1px solid {t['ctrl_border']};
-            color: {t['ctrl_fg']};
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 11px;
-        }}
-        .theme-btn:hover {{
-            background-color: {t['entry_bg']};
-            color: {t['text_primary']};
-        }}
-        .lib-add-btn {{
-            background-color: {t['entry_bg']};
-            border: 1px solid {t['entry_border']};
-            border-radius: 8px;
-            padding: 7px 10px;
-            color: {t['text_primary']};
-            font-size: 12px;
-        }}
-        .lib-add-btn:hover {{
-            background-color: {t['list_item_hover']};
-            border-color: {t['tab_active_bd']};
-            color: {t['tab_active_fg']};
-        }}
-        .lib-clear-btn {{
-            background: none;
-            border: none;
-            color: {t['text_muted']};
-            font-size: 10px;
-            padding: 2px 4px;
-            border-radius: 4px;
-        }}
-        .lib-clear-btn:hover {{
-            color: #e05555;
-            background-color: rgba(224,85,85,0.08);
-        }}
-        dialog {{
-            background-color: {t['window_bg']};
-            color: {t['text_primary']};
-        }}
-        dialog > .dialog-vbox,
-        dialog .dialog-vbox,
-        dialog contents,
-        dialog > contents {{
-            background-color: {t['window_bg']};
-            color: {t['text_primary']};
-        }}
-        dialog .card {{
-            background-color: {t['card_bg']};
-        }}
-        menubutton button {{
-            background: none;
-            border: 1px solid {t['ctrl_border']};
-            color: {t['ctrl_fg']};
-            border-radius: 8px;
-            min-width: 30px;
-            min-height: 28px;
-            padding: 0 6px;
-            font-size: 15px;
-            box-shadow: none;
-            outline: none;
-        }}
-        menubutton button:hover {{
-            background-color: {t['entry_bg']};
-            color: {t['text_primary']};
-            border-color: {t['entry_border']};
-            box-shadow: none;
-        }}
-        menubutton button:active,
-        menubutton button:checked {{
-            background-color: {t['entry_bg']};
-            color: {t['text_primary']};
-            border-color: {t['entry_border']};
-            box-shadow: none;
-        }}
-        menubutton button:focus {{
-            box-shadow: none;
-            outline: none;
-        }}
-        popover contents,
-        popover > contents {{
-            background-color: {t['card_bg']};
-            border: 1px solid {t['card_border']};
-            border-radius: 10px;
-            padding: 2px;
-        }}
-        popover arrow,
-        popover > arrow {{
-            background-color: {t['card_bg']};
-        }}
-        popover button.flat {{
-            background: none;
-            border: none;
-            border-radius: 6px;
-            color: {t['text_primary']};
-            padding: 8px 14px;
-            font-size: 12px;
-            min-width: 180px;
-        }}
-        popover button.flat:hover {{
-            background-color: {t['list_item_hover']};
-            color: {t['text_primary']};
-        }}
-        popover button.flat:active {{
-            background-color: {t['tab_active_bg']};
+        linkbutton,
+        linkbutton > label {{
             color: {t['tab_active_fg']};
         }}
 
-        /* ── Scrollbar dark mode (Win32 GTK4 sering bocor putih) ──────────── */
-        scrollbar {{
-            background-color: {t['card_bg']};
-            border: none;
+        /* ── Global widget overrides (dark mode leak prevention) ───────────── */
+        label {{
+            color: {t['text_primary']};
         }}
-        scrollbar trough {{
-            background-color: {t['card_bg']};
-            border-radius: 6px;
-            min-width: 6px;
-            min-height: 6px;
-        }}
-        scrollbar slider {{
-            background-color: {t['text_dim']};
-            border-radius: 6px;
-            min-width: 6px;
-            min-height: 40px;
-            border: 2px solid {t['card_bg']};
-        }}
-        scrollbar slider:hover {{
-            background-color: {t['text_muted']};
-        }}
-        scrollbar.vertical slider {{
-            min-width: 6px;
-        }}
-        scrollbar.horizontal slider {{
-            min-height: 6px;
-        }}
-
-        /* ── ScrolledWindow container ──────────────────────────────────────── */
-        scrolledwindow {{
-            background-color: {t['list_bg']};
-            border: none;
-        }}
-        scrolledwindow undershoot.top,
-        scrolledwindow undershoot.bottom,
-        scrolledwindow undershoot.left,
-        scrolledwindow undershoot.right {{
-            background: none;
-        }}
-        scrolledwindow overshoot.top,
-        scrolledwindow overshoot.bottom {{
-            background: none;
-        }}
-
-        /* ── Entry / SearchEntry ────────────────────────────────────────────── */
-        entry {{
+        entry, entry text {{
             background-color: {t['entry_bg']};
             color: {t['entry_text']};
             border: 1px solid {t['entry_border']};
             border-radius: 8px;
-            padding: 6px 10px;
             caret-color: {t['text_primary']};
             box-shadow: none;
         }}
@@ -588,49 +740,65 @@ class WindowCore(Gtk.ApplicationWindow):
             background-color: {t['entry_bg']};
             color: {t['entry_text']};
         }}
-
-        /* ── ListView / ListBox (library list) ─────────────────────────────── */
-        listview,
-        listbox {{
-            background-color: {t['list_bg']};
-            color: {t['text_primary']};
+        scrollbar {{
+            background-color: {t['card_bg']};
             border: none;
         }}
-        listview > row,
-        listbox > row {{
-            background-color: {t['list_item_bg']};
-            color: {t['text_primary']};
+        scrollbar trough {{
+            background-color: {t['entry_bg']};
+            border-radius: 6px;
+            min-width: 5px;
+            min-height: 5px;
+        }}
+        scrollbar slider {{
+            background-color: {t['text_dim']};
+            border-radius: 6px;
+            min-width: 5px;
+            min-height: 36px;
+            border: 2px solid {t['card_bg']};
+        }}
+        scrollbar slider:hover {{
+            background-color: {t['text_muted']};
+        }}
+        scrolledwindow {{
+            background-color: transparent;
             border: none;
-            padding: 0;
         }}
-        listview > row:hover,
-        listbox > row:hover {{
-            background-color: {t['list_item_hover']};
+        scrolledwindow undershoot.top,
+        scrolledwindow undershoot.bottom,
+        scrolledwindow undershoot.left,
+        scrolledwindow undershoot.right,
+        scrolledwindow overshoot.top,
+        scrolledwindow overshoot.bottom {{
+            background: none;
         }}
-        listview > row:selected,
-        listbox > row:selected {{
-            background-color: {t['list_sel_bg']};
-            color: {t['list_sel_fg']};
-        }}
-
-        /* ── Viewport (container dalam ScrolledWindow) ──────────────────────── */
         viewport {{
             background-color: {t['list_bg']};
             border: none;
         }}
-
-        /* ── HeaderBar (titlebar Windows bisa bocor terang) ─────────────────── */
-        headerbar {{
+        listview, listbox {{
+            background-color: {t['list_bg']};
+            color: {t['text_primary']};
+            border: none;
+        }}
+        listview > row, listbox > row {{
+            background-color: transparent;
+            color: {t['text_primary']};
+            border: none;
+            padding: 0;
+        }}
+        listview > row:selected, listbox > row:selected {{
+            background-color: {t['list_sel_bg']};
+            color: {t['list_sel_fg']};
+        }}
+        frame {{
             background-color: {t['card_bg']};
-            color: {t['text_primary']};
-            border-bottom: 1px solid {t['card_border']};
-            box-shadow: none;
+            border: 1px solid {t['card_border']};
+            border-radius: 8px;
         }}
-        headerbar .title {{
-            color: {t['text_primary']};
+        frame > border {{
+            border: none;
         }}
-
-        /* ── Tooltip ────────────────────────────────────────────────────────── */
         tooltip {{
             background-color: {t['card_bg']};
             color: {t['text_primary']};
@@ -641,83 +809,18 @@ class WindowCore(Gtk.ApplicationWindow):
         tooltip label {{
             color: {t['text_primary']};
         }}
-
-        /* ── Label default fallback ─────────────────────────────────────────── */
-        label {{
-            color: {t['text_primary']};
-        }}
-
-        /* ── Box & Frame ─────────────────────────────────────────────────────── */
-        frame {{
-            background-color: {t['card_bg']};
-            border: 1px solid {t['card_border']};
-            border-radius: 8px;
-        }}
-        frame > border {{
-            border: none;
-        }}
-
-        /* ── Revealer / Overlay ─────────────────────────────────────────────── */
-        revealer > * {{
-            background-color: transparent;
-        }}
-
-        /* ── Check & Radio button ───────────────────────────────────────────── */
-        checkbutton,
-        radiobutton {{
+        checkbutton, radiobutton {{
             color: {t['text_primary']};
             background: none;
         }}
-        check,
-        radio {{
+        check, radio {{
             background-color: {t['entry_bg']};
             border: 1px solid {t['entry_border']};
             border-radius: 4px;
         }}
-        check:checked,
-        radio:checked {{
+        check:checked, radio:checked {{
             background-color: {t['tab_active_bg']};
             border-color: {t['tab_active_bd']};
-            color: {t['tab_active_fg']};
-        }}
-
-        /* ── Separator ──────────────────────────────────────────────────────── */
-        separator {{
-            background-color: {t['sep_color']};
-            min-height: 1px;
-            min-width: 1px;
-        }}
-
-        /* ── SpinButton ─────────────────────────────────────────────────────── */
-        spinbutton {{
-            background-color: {t['entry_bg']};
-            color: {t['entry_text']};
-            border: 1px solid {t['entry_border']};
-            border-radius: 8px;
-        }}
-        spinbutton button {{
-            background: none;
-            border: none;
-            color: {t['text_muted']};
-        }}
-        spinbutton button:hover {{
-            background-color: {t['list_item_hover']};
-            color: {t['text_primary']};
-        }}
-
-        /* ── ComboBox / DropDown ────────────────────────────────────────────── */
-        combobox,
-        dropdown {{
-            background-color: {t['entry_bg']};
-            color: {t['entry_text']};
-            border: 1px solid {t['entry_border']};
-            border-radius: 8px;
-        }}
-        combobox button,
-        dropdown button {{
-            background-color: {t['entry_bg']};
-            color: {t['entry_text']};
-            border: none;
         }}
         """
 
