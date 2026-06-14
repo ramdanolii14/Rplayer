@@ -24,10 +24,24 @@ def collect_dir(src: Path, dst: str):
     return result
 
 # ── Source script ─────────────────────────────────────────────────────────────
+# Entry point + modul-modul pecahan (idr_config, idr_widgets, idr_dialogs,
+# idr_window_core, idr_window_ui) semuanya diletakkan 1 level di atas scripts/,
+# berdampingan dengan src_script.
 src_script = "idr_spectrum_player.py"   # letakkan 1 level di atas scripts/
+
+# Direktori project root (parent dari scripts/), tempat semua modul idr_*.py
+# berada. Ditambahkan ke pathex agar PyInstaller bisa resolve
+# "from idr_config import ..." dkk sebagai hidden imports.
+PROJECT_ROOT = Path(SPECPATH).parent
 
 # ── Hidden imports ────────────────────────────────────────────────────────────
 hidden_imports = [
+    # Modul-modul lokal hasil pecahan idr_spectrum_player.py
+    "idr_config",
+    "idr_widgets",
+    "idr_dialogs",
+    "idr_window_core",
+    "idr_window_ui",
     "gi",
     "gi.repository.Gtk",
     "gi.repository.Gdk",
@@ -151,7 +165,10 @@ runtime_hooks = ["scripts/rthook_gtk_windows.py"]
 # ── Analysis ──────────────────────────────────────────────────────────────────
 a = Analysis(
     [f"../{src_script}"],
-    pathex=[str(MINGW / "lib" / "python3.12" / "site-packages")],
+    pathex=[
+        str(MINGW / "lib" / "python3.12" / "site-packages"),
+        str(PROJECT_ROOT),
+    ],
     binaries=binaries,
     datas=datas,
     hiddenimports=hidden_imports,
