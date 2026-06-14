@@ -521,6 +521,204 @@ class WindowCore(Gtk.ApplicationWindow):
             background-color: {t['tab_active_bg']};
             color: {t['tab_active_fg']};
         }}
+
+        /* ── Scrollbar dark mode (Win32 GTK4 sering bocor putih) ──────────── */
+        scrollbar {{
+            background-color: {t['card_bg']};
+            border: none;
+        }}
+        scrollbar trough {{
+            background-color: {t['card_bg']};
+            border-radius: 6px;
+            min-width: 6px;
+            min-height: 6px;
+        }}
+        scrollbar slider {{
+            background-color: {t['text_dim']};
+            border-radius: 6px;
+            min-width: 6px;
+            min-height: 40px;
+            border: 2px solid {t['card_bg']};
+        }}
+        scrollbar slider:hover {{
+            background-color: {t['text_muted']};
+        }}
+        scrollbar.vertical slider {{
+            min-width: 6px;
+        }}
+        scrollbar.horizontal slider {{
+            min-height: 6px;
+        }}
+
+        /* ── ScrolledWindow container ──────────────────────────────────────── */
+        scrolledwindow {{
+            background-color: {t['list_bg']};
+            border: none;
+        }}
+        scrolledwindow undershoot.top,
+        scrolledwindow undershoot.bottom,
+        scrolledwindow undershoot.left,
+        scrolledwindow undershoot.right {{
+            background: none;
+        }}
+        scrolledwindow overshoot.top,
+        scrolledwindow overshoot.bottom {{
+            background: none;
+        }}
+
+        /* ── Entry / SearchEntry ────────────────────────────────────────────── */
+        entry {{
+            background-color: {t['entry_bg']};
+            color: {t['entry_text']};
+            border: 1px solid {t['entry_border']};
+            border-radius: 8px;
+            padding: 6px 10px;
+            caret-color: {t['text_primary']};
+            box-shadow: none;
+        }}
+        entry:focus {{
+            border-color: {t['tab_active_bd']};
+            box-shadow: none;
+        }}
+        entry selection {{
+            background-color: {t['tab_active_bg']};
+            color: {t['tab_active_fg']};
+        }}
+        text {{
+            background-color: {t['entry_bg']};
+            color: {t['entry_text']};
+        }}
+
+        /* ── ListView / ListBox (library list) ─────────────────────────────── */
+        listview,
+        listbox {{
+            background-color: {t['list_bg']};
+            color: {t['text_primary']};
+            border: none;
+        }}
+        listview > row,
+        listbox > row {{
+            background-color: {t['list_item_bg']};
+            color: {t['text_primary']};
+            border: none;
+            padding: 0;
+        }}
+        listview > row:hover,
+        listbox > row:hover {{
+            background-color: {t['list_item_hover']};
+        }}
+        listview > row:selected,
+        listbox > row:selected {{
+            background-color: {t['list_sel_bg']};
+            color: {t['list_sel_fg']};
+        }}
+
+        /* ── Viewport (container dalam ScrolledWindow) ──────────────────────── */
+        viewport {{
+            background-color: {t['list_bg']};
+            border: none;
+        }}
+
+        /* ── HeaderBar (titlebar Windows bisa bocor terang) ─────────────────── */
+        headerbar {{
+            background-color: {t['card_bg']};
+            color: {t['text_primary']};
+            border-bottom: 1px solid {t['card_border']};
+            box-shadow: none;
+        }}
+        headerbar .title {{
+            color: {t['text_primary']};
+        }}
+
+        /* ── Tooltip ────────────────────────────────────────────────────────── */
+        tooltip {{
+            background-color: {t['card_bg']};
+            color: {t['text_primary']};
+            border: 1px solid {t['card_border']};
+            border-radius: 6px;
+            padding: 4px 8px;
+        }}
+        tooltip label {{
+            color: {t['text_primary']};
+        }}
+
+        /* ── Label default fallback ─────────────────────────────────────────── */
+        label {{
+            color: {t['text_primary']};
+        }}
+
+        /* ── Box & Frame ─────────────────────────────────────────────────────── */
+        frame {{
+            background-color: {t['card_bg']};
+            border: 1px solid {t['card_border']};
+            border-radius: 8px;
+        }}
+        frame > border {{
+            border: none;
+        }}
+
+        /* ── Revealer / Overlay ─────────────────────────────────────────────── */
+        revealer > * {{
+            background-color: transparent;
+        }}
+
+        /* ── Check & Radio button ───────────────────────────────────────────── */
+        checkbutton,
+        radiobutton {{
+            color: {t['text_primary']};
+            background: none;
+        }}
+        check,
+        radio {{
+            background-color: {t['entry_bg']};
+            border: 1px solid {t['entry_border']};
+            border-radius: 4px;
+        }}
+        check:checked,
+        radio:checked {{
+            background-color: {t['tab_active_bg']};
+            border-color: {t['tab_active_bd']};
+            color: {t['tab_active_fg']};
+        }}
+
+        /* ── Separator ──────────────────────────────────────────────────────── */
+        separator {{
+            background-color: {t['sep_color']};
+            min-height: 1px;
+            min-width: 1px;
+        }}
+
+        /* ── SpinButton ─────────────────────────────────────────────────────── */
+        spinbutton {{
+            background-color: {t['entry_bg']};
+            color: {t['entry_text']};
+            border: 1px solid {t['entry_border']};
+            border-radius: 8px;
+        }}
+        spinbutton button {{
+            background: none;
+            border: none;
+            color: {t['text_muted']};
+        }}
+        spinbutton button:hover {{
+            background-color: {t['list_item_hover']};
+            color: {t['text_primary']};
+        }}
+
+        /* ── ComboBox / DropDown ────────────────────────────────────────────── */
+        combobox,
+        dropdown {{
+            background-color: {t['entry_bg']};
+            color: {t['entry_text']};
+            border: 1px solid {t['entry_border']};
+            border-radius: 8px;
+        }}
+        combobox button,
+        dropdown button {{
+            background-color: {t['entry_bg']};
+            color: {t['entry_text']};
+            border: none;
+        }}
         """
 
     def _setup_css(self):
@@ -603,6 +801,54 @@ class WindowCore(Gtk.ApplicationWindow):
             if not sink.is_linked():
                 pad.link(sink)
 
+    @staticmethod
+    def _parse_gst_float_list(s: "Gst.Structure", field: str) -> list:
+        """
+        Parse GstValueList dari Gst.Structure secara aman di semua platform.
+
+        Di Linux PyGObject, s.get_value("magnitude") langsung mengembalikan list.
+        Di Windows PyGObject (binding lebih tua / build MSYS2), tipe GstValueList
+        tidak terdaftar sehingga get_value() melempar TypeError.
+
+        Workaround: serialisasi structure ke string lalu parse manual.
+        Format: ... magnitude=(GValueArray){ -80.0, -75.3, ... } ...
+        """
+        # ── Coba cara normal dulu (Linux/versi baru) ──────────────────────────
+        try:
+            result = s.get_value(field)
+            if result is not None:
+                return list(result)
+        except TypeError:
+            pass  # fallthrough ke string parsing
+
+        # ── Fallback: parse dari repr string structure ────────────────────────
+        try:
+            text = s.to_string()
+            # Cari field, ambil isi antara { ... }
+            marker = f"{field}="
+            idx = text.find(marker)
+            if idx == -1:
+                return []
+            rest = text[idx + len(marker):]
+            # Lewati tipe opsional misal "(GValueArray)" atau "< float, ... >"
+            brace_start = rest.find("{")
+            brace_end   = rest.find("}")
+            if brace_start == -1 or brace_end == -1:
+                return []
+            inner = rest[brace_start + 1 : brace_end]
+            values = []
+            for token in inner.split(","):
+                token = token.strip().rstrip(";")
+                if not token:
+                    continue
+                try:
+                    values.append(float(token))
+                except ValueError:
+                    pass
+            return values
+        except Exception:
+            return []
+
     def _on_bus_msg(self, _bus, msg):
         t = msg.type
         if t == Gst.MessageType.EOS:
@@ -615,7 +861,7 @@ class WindowCore(Gtk.ApplicationWindow):
         elif t == Gst.MessageType.ELEMENT:
             s = msg.get_structure()
             if s and s.get_name() == "spectrum":
-                mags = s.get_value("magnitude")
+                mags = self._parse_gst_float_list(s, "magnitude")
                 if mags:
                     captured = list(mags)
                     GLib.idle_add(lambda m=captured: self._on_spectrum(m))
