@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IDR Spectrum</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Chart.js from CDN (bundled in Electron via webSecurity=false) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════ TITLEBAR ════════════════════════ -->
+  <div class="titlebar" id="titlebar">
+    <div class="tb-left nodrag">
+      <img src="assets/id.ramdanolii.idrspectrum.svg" class="tb-logo" alt="" onerror="this.style.display='none'">
+      <span class="tb-appname">IDR Spectrum</span>
+    </div>
+    <div class="tb-drag"></div>
+    <div class="tb-controls nodrag">
+      <button class="wbtn" id="btnMin" title="Minimise">
+        <svg viewBox="0 0 10 1"><rect width="10" height="1"/></svg>
+      </button>
+      <button class="wbtn" id="btnMax" title="Maximise">
+        <svg viewBox="0 0 10 10"><rect width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+      </button>
+      <button class="wbtn wbtn-close" id="btnClose" title="Close">
+        <svg viewBox="0 0 10 10">
+          <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.3"/>
+          <line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════ MAIN BODY ═══════════════════════════ -->
+  <div class="app-body">
+
+    <!-- ── LEFT: playlist ──────────────────────────────────────────────── -->
+    <aside class="side-panel">
+      <div class="side-header">
+        <button class="btn-open" id="btnOpenFolder">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>
+          Buka Folder
+        </button>
+        <span class="track-count" id="trackCount">0 lagu</span>
+      </div>
+
+      <div class="playlist" id="playlist">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-note">𝄞</div>
+          <p>Belum ada musik</p>
+          <small>Klik "Buka Folder" untuk mulai</small>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── RIGHT: IDR/USD chart ─────────────────────────────────────────── -->
+    <main class="chart-panel">
+      <header class="chart-header">
+        <div class="chart-title-wrap">
+          <span class="chart-eyebrow">Simulasi · Data historis IDR/USD</span>
+          <h1 class="chart-h1">Rupiah vs Dollar</h1>
+          <p class="chart-desc">Sejarah kelam Rupiah — dari Rp 1.843 hingga menyentuh <strong>Rp 16.000+</strong> per USD</p>
+        </div>
+        <div class="rate-badge">
+          <span class="rate-label">Kurs Mock</span>
+          <span class="rate-big">Rp 18.000</span>
+          <span class="rate-sub">per 1 USD</span>
+        </div>
+      </header>
+
+      <div class="chart-wrap">
+        <canvas id="idrChart"></canvas>
+      </div>
+
+      <footer class="chart-stats">
+        <div class="cs">
+          <span class="cs-k">Terendah</span>
+          <span class="cs-v">Rp 1.843</span>
+          <span class="cs-y">1990</span>
+        </div>
+        <div class="cs divider"></div>
+        <div class="cs">
+          <span class="cs-k">Puncak Krisis '98</span>
+          <span class="cs-v danger">Rp 16.650</span>
+          <span class="cs-y">Jun 1998</span>
+        </div>
+        <div class="cs divider"></div>
+        <div class="cs">
+          <span class="cs-k">Kurs 2024</span>
+          <span class="cs-v danger">Rp 16.261</span>
+          <span class="cs-y">Des 2024</span>
+        </div>
+        <div class="cs divider"></div>
+        <div class="cs">
+          <span class="cs-k">Depresiasi '90–'24</span>
+          <span class="cs-v danger">+783 %</span>
+          <span class="cs-y">34 tahun</span>
+        </div>
+      </footer>
+    </main>
+
+  </div><!-- /app-body -->
+
+  <!-- ════════════════════════════════ PLAYER BAR ══════════════════════════ -->
+  <div class="player-bar" id="playerBar">
+
+    <!-- Cover + Track info -->
+    <div class="pb-left">
+      <div class="pb-cover" id="pbCover">
+        <!-- Placeholder -->
+        <div class="cover-placeholder" id="coverPlaceholder">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
+          </svg>
+        </div>
+        <!-- Loading animation -->
+        <div class="cover-loading" id="coverLoading">
+          <span></span><span></span><span></span>
+        </div>
+        <!-- Actual cover image -->
+        <img id="coverImg" class="cover-img" alt="Cover" style="display:none">
+      </div>
+      <div class="pb-info">
+        <div class="pb-title" id="pbTitle">Tidak ada lagu</div>
+        <div class="pb-artist" id="pbArtist">—</div>
+        <div class="pb-meta" id="pbMeta"></div>
+      </div>
+    </div>
+
+    <!-- Controls + progress -->
+    <div class="pb-center">
+      <div class="ctrl-row">
+        <button class="ctrl-btn" id="btnShuffle" title="Acak (S)">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="17" height="17">
+            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn" id="btnPrev" title="Sebelumnya (←)">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+            <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
+          </svg>
+        </button>
+        <button class="ctrl-play" id="btnPlay" title="Play/Pause (Space)">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26" id="playIcon">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn" id="btnNext" title="Berikutnya (→)">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+            <path d="m6 18 8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn" id="btnRepeat" title="Ulangi (R)">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="17" height="17" id="repeatIcon">
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="progress-row">
+        <span class="time" id="timeCur">0:00</span>
+        <div class="seekbar" id="seekbar">
+          <div class="seek-fill" id="seekFill"></div>
+          <div class="seek-thumb" id="seekThumb"></div>
+        </div>
+        <span class="time" id="timeTot">0:00</span>
+      </div>
+    </div>
+
+    <!-- Volume -->
+    <div class="pb-right">
+      <button class="ctrl-btn" id="btnMute" title="Mute (M)">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" id="volIcon">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+      </button>
+      <input type="range" class="vol-slider" id="volSlider" min="0" max="100" value="80">
+    </div>
+
+  </div><!-- /player-bar -->
+
+  <script src="renderer.js"></script>
+</body>
+</html>

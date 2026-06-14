@@ -1,0 +1,33 @@
+{
+  "name": "idr-spectrum",
+  "version": "1.1.0",
+  "description": "IDR Spectrum — Chromium music player with IDR/USD historical chart",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-linux": "electron-builder --linux AppImage",
+    "build-deb": "electron-builder --linux deb"
+  },
+  "dependencies": {
+    "music-metadata": "^9.1.2"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "id.ramdanolii.idrspectrum",
+    "productName": "IDR Spectrum",
+    "copyright": "Copyright © 2025 Alycia (ramdanolii14)",
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "AudioVideo",
+      "icon": "assets/id.ramdanolii.idrspectrum.svg"
+    },
+    "files": [
+      "**/*",
+      "!**/*.map",
+      "assets/**"
+    ]
+  }
+}
