@@ -81,7 +81,8 @@ ipcMain.handle('get-music-files', async (_e, folderPath) => {
 // ─── Parse audio metadata ──────────────────────────────────────────────────
 ipcMain.handle('get-metadata', async (_e, filePath) => {
   try {
-    const mm = require('music-metadata')
+    // music-metadata v10+ is ESM-only — use dynamic import
+    const mm = await import('music-metadata')
     const { common, format } = await mm.parseFile(filePath, { duration: true })
 
     // Embedded cover → base64 data-URL

@@ -9,7 +9,7 @@
     "build-deb": "electron-builder --linux deb"
   },
   "dependencies": {
-    "music-metadata": "^9.1.2"
+    "music-metadata": "^10.9.1"
   },
   "devDependencies": {
     "electron": "^31.0.0",
@@ -20,7 +20,10 @@
     "productName": "IDR Spectrum",
     "copyright": "Copyright © 2025 Alycia (ramdanolii14)",
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "AudioVideo",
       "icon": "assets/id.ramdanolii.idrspectrum.svg"
     },
