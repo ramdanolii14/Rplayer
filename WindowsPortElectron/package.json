@@ -1,10 +1,12 @@
 {
   "name": "idr-spectrum",
   "version": "1.1.0",
+  "author": "Ramdan Olii",
   "description": "IDR Spectrum — Chromium music player with IDR/USD historical chart",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "build-win": "electron-builder --win",
     "build-linux": "electron-builder --linux AppImage",
     "build-deb": "electron-builder --linux deb"
   },
@@ -15,38 +17,37 @@
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
-
-  "win": {
-  "target": [
-    { "target": "nsis", "arch": ["x64"] },
-    { "target": "portable", "arch": ["x64"] }
-  ],
-  "icon": "assets/id.ramdanolii.idrspectrum.ico"
-  },
-  "nsis": {
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true,
-    "shortcutName": "IDR Spectrum"
-  },
-
   "build": {
     "appId": "id.ramdanolii.idrspectrum",
     "productName": "IDR Spectrum",
     "copyright": "Copyright © 2025 Alycia (ramdanolii14)",
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "AudioVideo",
-      "icon": "assets/id.ramdanolii.idrspectrum.svg"
-    },
     "files": [
       "**/*",
       "!**/*.map",
-      "assets/**"
-    ]
+      "assets/**",
+      "!node_modules/.cache"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "assets/id.ramdanolii.idrspectrum.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IDR Spectrum",
+      "installerIcon": "assets/id.ramdanolii.idrspectrum.ico",
+      "uninstallerIcon": "assets/id.ramdanolii.idrspectrum.ico",
+      "installerHeaderIcon": "assets/id.ramdanolii.idrspectrum.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "AudioVideo",
+      "icon": "assets/id.ramdanolii.idrspectrum.ico"
+    }
   }
 }
