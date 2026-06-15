@@ -15,6 +15,22 @@
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
+
+  "win": {
+  "target": [
+    { "target": "nsis", "arch": ["x64"] },
+    { "target": "portable", "arch": ["x64"] }
+  ],
+  "icon": "assets/id.ramdanolii.idrspectrum.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "IDR Spectrum"
+  },
+
   "build": {
     "appId": "id.ramdanolii.idrspectrum",
     "productName": "IDR Spectrum",
